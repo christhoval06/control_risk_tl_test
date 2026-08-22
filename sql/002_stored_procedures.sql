@@ -1,3 +1,50 @@
+CREATE OR ALTER PROCEDURE dbo.User_Upsert
+    @ExternalId NVARCHAR(200),
+    @Email NVARCHAR(320) = NULL,
+    @DisplayName NVARCHAR(200) = NULL,
+    @Provider NVARCHAR(60)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    MERGE dbo.Users AS target
+    USING
+    (
+        SELECT
+            LTRIM(RTRIM(@ExternalId)) AS ExternalId,
+            NULLIF(LTRIM(RTRIM(@Email)), '') AS Email,
+            NULLIF(LTRIM(RTRIM(@DisplayName)), '') AS DisplayName,
+            LTRIM(RTRIM(@Provider)) AS Provider
+    ) AS source
+    ON target.ExternalId = source.ExternalId
+    WHEN MATCHED THEN
+        UPDATE SET
+            Email = COALESCE(source.Email, target.Email),
+            DisplayName = COALESCE(source.DisplayName, target.DisplayName),
+            Provider = source.Provider,
+            UpdatedAt = SYSUTCDATETIME()
+    WHEN NOT MATCHED THEN
+        INSERT (Id, ExternalId, Email, DisplayName, Provider, CreatedAt, UpdatedAt)
+        VALUES (NEWID(), source.ExternalId, source.Email, source.DisplayName, source.Provider, SYSUTCDATETIME(), SYSUTCDATETIME());
+
+    SELECT ExternalId, Email, DisplayName, Provider
+    FROM dbo.Users
+    WHERE ExternalId = LTRIM(RTRIM(@ExternalId));
+END;
+GO
+
+CREATE OR ALTER PROCEDURE dbo.User_GetByExternalId
+    @ExternalId NVARCHAR(200)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT ExternalId, Email, DisplayName, Provider
+    FROM dbo.Users
+    WHERE ExternalId = LTRIM(RTRIM(@ExternalId));
+END;
+GO
+
 CREATE OR ALTER PROCEDURE dbo.Task_Create
     @Id UNIQUEIDENTIFIER,
     @Title NVARCHAR(200),

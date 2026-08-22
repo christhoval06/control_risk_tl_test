@@ -13,6 +13,8 @@ var host = new HostBuilder()
         services.AddSingleton<IConfiguration>(context.Configuration);
         services.AddSingleton<IJwtPrincipalReader, JwtPrincipalReader>();
         services.AddScoped<ITaskFactory, TaskManagement.Api.Factories.TaskFactory>();
+        services.AddScoped<IUserRepository, SqlUserRepository>();
+        services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ITaskRepository, SqlTaskRepository>();
         services.AddScoped<ITaskService, TaskService>();
     })

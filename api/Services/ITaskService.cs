@@ -4,34 +4,34 @@ namespace TaskManagement.Api.Services;
 
 public interface ITaskService
 {
-    Task<TaskResponse> CreateAsync(
+    Task<ServiceResponse<TaskResponse>> CreateAsync(
         CreateTaskRequest request,
         string authenticatedUserId,
         CancellationToken cancellationToken);
 
-    Task<TaskResponse?> GetByIdAsync(
+    Task<ServiceResponse<TaskResponse>> GetByIdAsync(
         Guid id,
         string authenticatedUserId,
         CancellationToken cancellationToken);
 
-    Task<TaskListResponse> ListAsync(
+    Task<ServiceResponse<TaskListResponse>> ListAsync(
         TaskQuery query,
         string authenticatedUserId,
         CancellationToken cancellationToken);
 
-    Task<TaskResponse?> UpdateAsync(
+    Task<ServiceResponse<TaskResponse>> UpdateAsync(
         Guid id,
         UpdateTaskRequest request,
         string authenticatedUserId,
         CancellationToken cancellationToken);
 
-    Task<TaskResponse?> UpdateStatusAsync(
+    Task<ServiceResponse<TaskResponse>> UpdateStatusAsync(
         Guid id,
         UpdateTaskStatusRequest request,
         string authenticatedUserId,
         CancellationToken cancellationToken);
 
-    Task<bool> DeleteAsync(
+    Task<ServiceResponse<object?>> DeleteAsync(
         Guid id,
         string authenticatedUserId,
         CancellationToken cancellationToken);

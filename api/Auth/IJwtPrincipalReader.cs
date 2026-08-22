@@ -5,4 +5,6 @@ namespace TaskManagement.Api.Auth;
 public interface IJwtPrincipalReader
 {
     string? GetUserId(HttpRequestData request);
+
+    AuthPrincipal? GetPrincipal(HttpRequestData request);
 }

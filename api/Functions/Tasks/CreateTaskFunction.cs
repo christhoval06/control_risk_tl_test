@@ -4,6 +4,7 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using TaskManagement.Api.Auth;
 using TaskManagement.Api.Dtos;
+using TaskManagement.Api.Errors;
 using TaskManagement.Api.Services;
 
 namespace TaskManagement.Api.Functions.Tasks;
@@ -29,21 +30,29 @@ public sealed class CreateTaskFunction
         var userId = _principalReader.GetUserId(request);
         if (string.IsNullOrWhiteSpace(userId))
         {
-            return request.CreateJsonResponse(HttpStatusCode.Unauthorized, new { title = "Unauthorized", status = 401 });
+            return request.CreateErrorResponse(HttpStatusCode.Unauthorized, ErrorCatalog.AuthRequired);
         }
 
-        var createRequest = await JsonSerializer.DeserializeAsync<CreateTaskRequest>(
-            request.Body,
-            JsonOptions,
-            cancellationToken);
+        CreateTaskRequest? createRequest;
+        try
+        {
+            createRequest = await JsonSerializer.DeserializeAsync<CreateTaskRequest>(
+                request.Body,
+                JsonOptions,
+                cancellationToken);
+        }
+        catch (JsonException)
+        {
+            return request.CreateErrorResponse(HttpStatusCode.BadRequest, ErrorCatalog.InvalidRequestBody);
+        }
 
         if (createRequest is null)
         {
-            return request.CreateJsonResponse(HttpStatusCode.BadRequest, new { title = "Invalid request body", status = 400 });
+            return request.CreateErrorResponse(HttpStatusCode.BadRequest, ErrorCatalog.InvalidRequestBody);
         }
 
         var created = await _taskService.CreateAsync(createRequest, userId, cancellationToken);
 
-        return request.CreateJsonResponse(HttpStatusCode.Created, created);
+        return request.CreateServiceResponse(HttpStatusCode.Created, created);
     }
 }

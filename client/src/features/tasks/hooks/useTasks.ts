@@ -68,7 +68,7 @@ export function useTasks(token: string) {
   }, [deleteMutation, refreshTasks, token]);
 
   return useMemo(() => ({
-    tasks: listQuery.data?.items ?? [],
+    tasks: listQuery.data?.data?.items ?? [],
     query,
     setQuery,
     isLoading: listQuery.isFetching,
@@ -78,5 +78,5 @@ export function useTasks(token: string) {
     submitTask,
     changeStatus,
     removeTask
-  }), [actionError, changeStatus, createMutation.isPending, listQuery.data?.items, listQuery.isError, listQuery.isFetching, loadTasks, query, removeTask, setQuery, submitTask]);
+  }), [actionError, changeStatus, createMutation.isPending, listQuery.data?.data?.items, listQuery.isError, listQuery.isFetching, loadTasks, query, removeTask, setQuery, submitTask]);
 }

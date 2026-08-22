@@ -1,5 +1,6 @@
 using TaskManagement.Api.Domain;
 using TaskManagement.Api.Dtos;
+using TaskManagement.Api.Errors;
 using TaskManagement.Api.Factories;
 using TaskManagement.Api.Repositories;
 
@@ -23,12 +24,20 @@ public sealed class TaskService : ITaskService
         _taskFactory = taskFactory;
     }
 
-    public async Task<TaskResponse> CreateAsync(
+    /// <summary>
+    /// Creates a task owned by the authenticated user.
+    /// </summary>
+    public async Task<ServiceResponse<TaskResponse>> CreateAsync(
         CreateTaskRequest request,
         string authenticatedUserId,
         CancellationToken cancellationToken)
     {
         EnsureAuthenticatedUser(authenticatedUserId);
+
+        if (string.IsNullOrWhiteSpace(request.Title))
+        {
+            return ServiceResponse<TaskResponse>.Error(ErrorCatalog.TaskTitleRequired);
+        }
 
         var task = _taskFactory.Create(
             request.Title,
@@ -39,10 +48,16 @@ public sealed class TaskService : ITaskService
 
         var created = await _repository.CreateAsync(task, cancellationToken);
 
-        return Map(created);
+        return ServiceResponse<TaskResponse>.Ok(
+            Map(created),
+            ServiceCodes.TaskCreated,
+            "Task created successfully.");
     }
 
-    public async Task<TaskResponse?> GetByIdAsync(
+    /// <summary>
+    /// Retrieves one task scoped to the authenticated user.
+    /// </summary>
+    public async Task<ServiceResponse<TaskResponse>> GetByIdAsync(
         Guid id,
         string authenticatedUserId,
         CancellationToken cancellationToken)
@@ -51,10 +66,18 @@ public sealed class TaskService : ITaskService
 
         var task = await _repository.GetByIdAsync(id, authenticatedUserId, cancellationToken);
 
-        return task is null ? null : Map(task);
+        return task is null
+            ? ServiceResponse<TaskResponse>.Error(ErrorCatalog.TaskNotFound)
+            : ServiceResponse<TaskResponse>.Ok(
+                Map(task),
+                ServiceCodes.TaskRetrieved,
+                "Task retrieved successfully.");
     }
 
-    public async Task<TaskListResponse> ListAsync(
+    /// <summary>
+    /// Lists tasks for the authenticated user using normalized server-side filters.
+    /// </summary>
+    public async Task<ServiceResponse<TaskListResponse>> ListAsync(
         TaskQuery query,
         string authenticatedUserId,
         CancellationToken cancellationToken)
@@ -65,10 +88,16 @@ public sealed class TaskService : ITaskService
         var tasks = await _repository.ListAsync(authenticatedUserId, normalizedQuery, cancellationToken);
         var responses = tasks.Select(Map).ToArray();
 
-        return new TaskListResponse(responses, normalizedQuery.Page, normalizedQuery.PageSize);
+        return ServiceResponse<TaskListResponse>.Ok(
+            new TaskListResponse(responses, normalizedQuery.Page, normalizedQuery.PageSize),
+            ServiceCodes.TasksListed,
+            "Tasks listed successfully.");
     }
 
-    public async Task<TaskResponse?> UpdateAsync(
+    /// <summary>
+    /// Updates a task when it exists for the authenticated user.
+    /// </summary>
+    public async Task<ServiceResponse<TaskResponse>> UpdateAsync(
         Guid id,
         UpdateTaskRequest request,
         string authenticatedUserId,
@@ -78,15 +107,23 @@ public sealed class TaskService : ITaskService
 
         if (string.IsNullOrWhiteSpace(request.Title))
         {
-            throw new ArgumentException("Title is required.", nameof(request));
+            return ServiceResponse<TaskResponse>.Error(ErrorCatalog.TaskTitleRequired);
         }
 
         var updated = await _repository.UpdateAsync(id, authenticatedUserId, request, cancellationToken);
 
-        return updated is null ? null : Map(updated);
+        return updated is null
+            ? ServiceResponse<TaskResponse>.Error(ErrorCatalog.TaskNotFound)
+            : ServiceResponse<TaskResponse>.Ok(
+                Map(updated),
+                ServiceCodes.TaskUpdated,
+                "Task updated successfully.");
     }
 
-    public async Task<TaskResponse?> UpdateStatusAsync(
+    /// <summary>
+    /// Updates only the workflow status for an existing task.
+    /// </summary>
+    public async Task<ServiceResponse<TaskResponse>> UpdateStatusAsync(
         Guid id,
         UpdateTaskStatusRequest request,
         string authenticatedUserId,
@@ -100,17 +137,29 @@ public sealed class TaskService : ITaskService
             request.Status,
             cancellationToken);
 
-        return updated is null ? null : Map(updated);
+        return updated is null
+            ? ServiceResponse<TaskResponse>.Error(ErrorCatalog.TaskNotFound)
+            : ServiceResponse<TaskResponse>.Ok(
+                Map(updated),
+                ServiceCodes.TaskStatusUpdated,
+                "Task status updated successfully.");
     }
 
-    public Task<bool> DeleteAsync(
+    /// <summary>
+    /// Deletes a task when it exists for the authenticated user.
+    /// </summary>
+    public async Task<ServiceResponse<object?>> DeleteAsync(
         Guid id,
         string authenticatedUserId,
         CancellationToken cancellationToken)
     {
         EnsureAuthenticatedUser(authenticatedUserId);
 
-        return _repository.DeleteAsync(id, authenticatedUserId, cancellationToken);
+        var deleted = await _repository.DeleteAsync(id, authenticatedUserId, cancellationToken);
+
+        return deleted
+            ? ServiceResponse<object?>.Ok(null, ServiceCodes.TaskDeleted, "Task deleted successfully.")
+            : ServiceResponse<object?>.Error(ErrorCatalog.TaskNotFound);
     }
 
     private static TaskQuery Normalize(TaskQuery query)
