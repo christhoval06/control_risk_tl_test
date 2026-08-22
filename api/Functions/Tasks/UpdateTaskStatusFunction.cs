@@ -4,6 +4,7 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using TaskManagement.Api.Auth;
 using TaskManagement.Api.Dtos;
+using TaskManagement.Api.Errors;
 using TaskManagement.Api.Services;
 
 namespace TaskManagement.Api.Functions.Tasks;
@@ -30,25 +31,29 @@ public sealed class UpdateTaskStatusFunction
         var userId = _principalReader.GetUserId(request);
         if (string.IsNullOrWhiteSpace(userId))
         {
-            return request.CreateJsonResponse(HttpStatusCode.Unauthorized, new { title = "Unauthorized", status = 401 });
+            return request.CreateErrorResponse(HttpStatusCode.Unauthorized, ErrorCatalog.AuthRequired);
         }
 
-        var updateRequest = await JsonSerializer.DeserializeAsync<UpdateTaskStatusRequest>(
-            request.Body,
-            JsonOptions,
-            cancellationToken);
+        UpdateTaskStatusRequest? updateRequest;
+        try
+        {
+            updateRequest = await JsonSerializer.DeserializeAsync<UpdateTaskStatusRequest>(
+                request.Body,
+                JsonOptions,
+                cancellationToken);
+        }
+        catch (JsonException)
+        {
+            return request.CreateErrorResponse(HttpStatusCode.BadRequest, ErrorCatalog.InvalidRequestBody);
+        }
 
         if (updateRequest is null)
         {
-            return request.CreateJsonResponse(HttpStatusCode.BadRequest, new { title = "Invalid request body", status = 400 });
+            return request.CreateErrorResponse(HttpStatusCode.BadRequest, ErrorCatalog.InvalidRequestBody);
         }
 
-        var task = await _taskService.UpdateStatusAsync(id, updateRequest, userId, cancellationToken);
-        if (task is null)
-        {
-            return request.CreateJsonResponse(HttpStatusCode.NotFound, new { title = "Task not found", status = 404 });
-        }
+        var result = await _taskService.UpdateStatusAsync(id, updateRequest, userId, cancellationToken);
 
-        return request.CreateJsonResponse(HttpStatusCode.OK, task);
+        return request.CreateServiceResponse(HttpStatusCode.OK, result);
     }
 }

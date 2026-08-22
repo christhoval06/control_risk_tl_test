@@ -123,19 +123,38 @@ VITE_API_BASE_URL=https://<apim-name>.azure-api.net/api
 
 ## Local IaC Deployment
 
-For local testing:
+For local testing, use the deploy CLI:
 
 ```bash
-az login
-az group create --name rg-task-management-dev --location eastus
-az deployment group create \
-  --resource-group rg-task-management-dev \
-  --template-file infra/main.bicep \
-  --parameters @infra/params.dev.json \
-  --parameters sqlAdministratorPassword='<secure-password>'
+export AZURE_SUBSCRIPTION_ID='<subscription-id>'
+export AZURE_TENANT_ID='<tenant-id>'
+export APIM_PUBLISHER_EMAIL='me@example.com'
+export APIM_PUBLISHER_NAME='Task Management'
+export CORS_ALLOWED_ORIGINS='["http://localhost:5173"]'
+export JWT_AUTHORITY='https://login.microsoftonline.com/<tenant-id>/v2.0'
+export JWT_AUDIENCE='api://<api-client-id>'
+export SQL_ADMIN_LOGIN='sqladminuser'
+
+./scripts/deploy-local.sh dev --what-if
+./scripts/deploy-local.sh dev
 ```
 
-Then publish the API:
+The CLI validates local tools before it deploys. If Azure CLI, Azure Bicep CLI, or `jq` is missing, it stops and tells you which app to install. It reads `SQL_ADMIN_PASSWORD` from the environment or prompts for it securely; do not commit the password to any file.
+
+Useful flags:
+
+```text
+--location <location>
+--subscription <id>
+--tenant <id>
+--resource-group <name>
+--app-name <name>
+--params <file>
+--skip-login-check
+--what-if
+```
+
+After Bicep deploys the infrastructure, publish the API:
 
 ```bash
 cd api

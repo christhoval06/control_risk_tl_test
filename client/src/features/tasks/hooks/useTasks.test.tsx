@@ -49,9 +49,11 @@ describe('useTasks', () => {
   beforeEach(() => {
     queryClient = new QueryClient();
     useTaskStore.getState().reset();
-    generated.refetch.mockResolvedValue({ data: { items: [task] } });
+    generated.refetch.mockResolvedValue({
+      data: { data: { items: [task], page: 1, pageSize: 20 }, code: 'TASKS_LISTED', status: 'ok', message: 'Tasks listed successfully.' }
+    });
     generated.list.mockReturnValue({
-      data: { items: [task] },
+      data: { data: { items: [task], page: 1, pageSize: 20 }, code: 'TASKS_LISTED', status: 'ok', message: 'Tasks listed successfully.' },
       isFetching: false,
       isError: false,
       refetch: generated.refetch

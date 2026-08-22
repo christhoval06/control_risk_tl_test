@@ -1,6 +1,7 @@
 using Moq;
 using TaskManagement.Api.Domain;
 using TaskManagement.Api.Dtos;
+using TaskManagement.Api.Errors;
 using TaskManagement.Api.Factories;
 using TaskManagement.Api.Repositories;
 using TaskManagement.Api.Services;
@@ -28,10 +29,36 @@ public sealed class TaskServiceTests
             "creator-1",
             CancellationToken.None);
 
-        Assert.Equal("Pay invoice", result.Title);
-        Assert.Equal("creator-1", result.CreatedBy);
-        Assert.Equal("assignee-1", result.AssignedTo);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ServiceResponseStatus.Ok, result.Status);
+        Assert.Equal(ServiceCodes.TaskCreated, result.Code);
+        Assert.Equal("Task created successfully.", result.Message);
+        Assert.Equal("Pay invoice", result.Data?.Title);
+        Assert.Equal("creator-1", result.Data?.CreatedBy);
+        Assert.Equal("assignee-1", result.Data?.AssignedTo);
         Assert.Equal(TaskItemStatus.Pending, capturedTask?.Status);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_ReturnsNotFoundError_WhenTaskDoesNotExist()
+    {
+        var repository = new Mock<ITaskRepository>();
+        repository
+            .Setup(repository => repository.GetByIdAsync(
+                It.IsAny<Guid>(),
+                "user-1",
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((TaskItem?)null);
+
+        var service = new TaskService(repository.Object, new DomainTaskFactory());
+
+        var result = await service.GetByIdAsync(Guid.NewGuid(), "user-1", CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ServiceResponseStatus.Error, result.Status);
+        Assert.Equal(ServiceCodes.TaskNotFound, result.Code);
+        Assert.Equal("Task was not found.", result.Message);
+        Assert.Null(result.Data);
     }
 
     [Fact]
@@ -51,7 +78,9 @@ public sealed class TaskServiceTests
             "user-1",
             CancellationToken.None);
 
-        Assert.Empty(result.Items);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ServiceCodes.TasksListed, result.Code);
+        Assert.Empty(result.Data?.Items ?? Array.Empty<TaskResponse>());
         Assert.Equal(1, capturedQuery?.Page);
         Assert.Equal(100, capturedQuery?.PageSize);
         Assert.Equal("dueDate", capturedQuery?.SortBy);

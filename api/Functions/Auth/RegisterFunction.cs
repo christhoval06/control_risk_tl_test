@@ -3,41 +3,40 @@ using System.Text.Json;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using TaskManagement.Api.Auth;
-using TaskManagement.Api.Dtos;
+using TaskManagement.Api.Dtos.Auth;
 using TaskManagement.Api.Errors;
 using TaskManagement.Api.Services;
 
-namespace TaskManagement.Api.Functions.Tasks;
+namespace TaskManagement.Api.Functions.Auth;
 
-public sealed class UpdateTaskFunction
+public sealed class RegisterFunction
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    private readonly ITaskService _taskService;
+    private readonly IAuthService _authService;
     private readonly IJwtPrincipalReader _principalReader;
 
-    public UpdateTaskFunction(ITaskService taskService, IJwtPrincipalReader principalReader)
+    public RegisterFunction(IAuthService authService, IJwtPrincipalReader principalReader)
     {
-        _taskService = taskService;
+        _authService = authService;
         _principalReader = principalReader;
     }
 
-    [Function(nameof(UpdateTaskFunction))]
+    [Function(nameof(RegisterFunction))]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "tasks/{id:guid}")] HttpRequestData request,
-        Guid id,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "auth/register")] HttpRequestData request,
         CancellationToken cancellationToken)
     {
-        var userId = _principalReader.GetUserId(request);
-        if (string.IsNullOrWhiteSpace(userId))
+        var principal = _principalReader.GetPrincipal(request);
+        if (principal is null)
         {
             return request.CreateErrorResponse(HttpStatusCode.Unauthorized, ErrorCatalog.AuthRequired);
         }
 
-        UpdateTaskRequest? updateRequest;
+        RegisterUserRequest? registerRequest;
         try
         {
-            updateRequest = await JsonSerializer.DeserializeAsync<UpdateTaskRequest>(
+            registerRequest = await JsonSerializer.DeserializeAsync<RegisterUserRequest>(
                 request.Body,
                 JsonOptions,
                 cancellationToken);
@@ -47,12 +46,12 @@ public sealed class UpdateTaskFunction
             return request.CreateErrorResponse(HttpStatusCode.BadRequest, ErrorCatalog.InvalidRequestBody);
         }
 
-        if (updateRequest is null)
+        if (registerRequest is null)
         {
             return request.CreateErrorResponse(HttpStatusCode.BadRequest, ErrorCatalog.InvalidRequestBody);
         }
 
-        var result = await _taskService.UpdateAsync(id, updateRequest, userId, cancellationToken);
+        var result = await _authService.RegisterAsync(principal, registerRequest, cancellationToken);
 
         return request.CreateServiceResponse(HttpStatusCode.OK, result);
     }

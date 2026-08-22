@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using TaskManagement.Api.Auth;
+using TaskManagement.Api.Errors;
 using TaskManagement.Api.Services;
 
 namespace TaskManagement.Api.Functions.Tasks;
@@ -26,15 +27,11 @@ public sealed class GetTaskByIdFunction
         var userId = _principalReader.GetUserId(request);
         if (string.IsNullOrWhiteSpace(userId))
         {
-            return request.CreateJsonResponse(HttpStatusCode.Unauthorized, new { title = "Unauthorized", status = 401 });
+            return request.CreateErrorResponse(HttpStatusCode.Unauthorized, ErrorCatalog.AuthRequired);
         }
 
-        var task = await _taskService.GetByIdAsync(id, userId, cancellationToken);
-        if (task is null)
-        {
-            return request.CreateJsonResponse(HttpStatusCode.NotFound, new { title = "Task not found", status = 404 });
-        }
+        var result = await _taskService.GetByIdAsync(id, userId, cancellationToken);
 
-        return request.CreateJsonResponse(HttpStatusCode.OK, task);
+        return request.CreateServiceResponse(HttpStatusCode.OK, result);
     }
 }

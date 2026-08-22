@@ -1,10 +1,10 @@
-# Task Management App
+# Task Management App Documentation
 
-Full-stack technical-test implementation plan for a task management web application with Azure integration.
+Full-stack technical-test implementation for a task management web application with Azure integration.
 
 The application allows authenticated users to register or sign in, manage tasks, filter and sort task lists, and receive task-status updates in real time. The target stack follows the assessment requirements:
 
-- Frontend: React, TypeScript, Tailwind CSS, React Router, react-auth-kit, react-hook-form, Zustand, and Kubb-generated API hooks/client
+- Frontend: React, TypeScript, Tailwind CSS, React Router, react-auth-kit, react-hook-form, Zustand, and Kubb-generated API hooks
 - Backend: C# Azure Functions
 - Database: Azure SQL Server
 - Authentication: OAuth2/OpenID Connect with JWT validation
@@ -126,15 +126,17 @@ The database should contain a `Tasks` table with indexes for ownership, assignee
 
 ## Authentication Setup
 
-The preferred production provider is Microsoft Entra ID because it aligns naturally with Azure Functions and Azure-hosted deployments.
+The preferred production setup is an OAuth2/OpenID Connect identity broker. Microsoft Entra External ID or Azure AD B2C keeps the architecture Azure-native while allowing Microsoft, Google, and GitHub login from one frontend/backend integration.
 
 1. Create an app registration for the SPA client.
 2. Create or expose an API app registration for the Azure Functions backend.
-3. Add a delegated scope such as `Tasks.Access`.
-4. Configure the SPA redirect URI as `http://localhost:5173/auth/callback` for local development.
-5. Configure the API audience as `api://<api-client-id>`.
-6. Validate JWT access tokens before allowing task operations.
-7. Store the authenticated subject claim as `createdBy` when a task is created.
+3. Configure Microsoft, Google, and GitHub as identity providers in the broker.
+4. Add a delegated scope such as `Tasks.Access`.
+5. Configure the SPA redirect URI as `http://localhost:5173/auth/callback` for local development.
+6. Configure the API audience as `api://<api-client-id>`.
+7. Validate JWT access tokens before allowing task operations.
+8. Store the authenticated subject claim as `createdBy` when a task is created.
+9. Store local app profile data through `/api/auth/register`; never store passwords in this API.
 
 The frontend should request an access token before calling the API and send it as:
 
@@ -174,11 +176,13 @@ GET /api/tasks?status=Pending&assignedTo=<user-id>&search=invoice&sortBy=dueDate
 
 - Azure Functions keep the backend deployment lightweight while still supporting dependency injection, middleware, and clean request handlers.
 - The backend separates function triggers, services, repositories, factories, and DTOs to keep HTTP, business rules, and SQL persistence independent.
+- Application services return standardized `{ data, code, status, message }` envelopes and use a central error dictionary for known failures.
 - Azure SQL stores tasks with stored procedures for predictable performance and reviewable data access.
 - OAuth2/OpenID Connect keeps identity concerns outside the custom application code while still allowing JWT-based authorization in the API.
 - React Router data routes provide route-level lazy loading.
 - react-auth-kit owns frontend auth/session persistence behind the local `useAuth()` facade.
 - Kubb generates React Query hooks from `docs/swagger.json`; task CRUD consumes generated hooks rather than manual API wrappers.
+- Azure API Management exposes the public API facade in front of Azure Functions.
 - Real-time status updates can start with Server-Sent Events from an HTTP-triggered function and later move to Azure SignalR Service if scale requires it.
 
 See `docs/architecture.md` for the fuller design.
@@ -188,7 +192,7 @@ See `docs/architecture.md` for the fuller design.
 Backend tests:
 
 ```bash
-dotnet test tests
+dotnet test tests/TaskManagement.Tests.csproj
 ```
 
 Frontend tests:
@@ -210,15 +214,28 @@ Recommended test coverage:
 
 ## CI/CD
 
-The repository is structured for GitHub Actions. A complete workflow should:
+The CI workflow runs on pull requests and pushes to `main` or `develop`.
 
-1. Restore and build the C# Azure Functions app.
-2. Run xUnit tests.
-3. Install frontend dependencies.
-4. Generate the typed API client from `docs/swagger.json` with Kubb.
-5. Run frontend type checks, tests, and build.
-6. Validate Swagger JSON.
-7. Publish build artifacts for Azure deployment.
+Backend CI:
+
+```bash
+dotnet restore TaskManagement.sln
+dotnet test tests/TaskManagement.Tests.csproj --configuration Release --no-restore -- RunConfiguration.TreatNoTestsAsError=true
+```
+
+The `TreatNoTestsAsError` setting makes the job fail if test discovery returns zero tests.
+
+Frontend CI installs pnpm with `pnpm/action-setup@v4` before enabling the pnpm cache in `actions/setup-node@v4`. It then runs:
+
+```bash
+cd client
+pnpm install --frozen-lockfile
+pnpm run api:generate
+pnpm test
+pnpm run build
+```
+
+The docs job validates `docs/swagger.json` with Python's JSON parser.
 
 API deployment is implemented with:
 

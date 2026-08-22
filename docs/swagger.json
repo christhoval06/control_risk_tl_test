@@ -17,6 +17,103 @@
     }
   ],
   "paths": {
+    "/auth/login": {
+      "post": {
+        "summary": "Complete application login using a validated external identity token",
+        "operationId": "login",
+        "responses": {
+          "200": {
+            "description": "Login completed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthUserEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "summary": "Acknowledge API-side logout",
+        "operationId": "logout",
+        "responses": {
+          "200": {
+            "description": "Logout completed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmptyEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "summary": "Create or update the local application profile for the authenticated external identity",
+        "operationId": "register",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User registered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthUserEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "summary": "Return the current authenticated application profile",
+        "operationId": "getCurrentUser",
+        "responses": {
+          "200": {
+            "description": "User profile loaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthUserEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
     "/tasks": {
       "get": {
         "summary": "List tasks visible to the authenticated user",
@@ -88,7 +185,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TaskListResponse"
+                  "$ref": "#/components/schemas/TaskListEnvelope"
                 }
               }
             }
@@ -117,7 +214,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TaskResponse"
+                  "$ref": "#/components/schemas/TaskEnvelope"
                 }
               }
             }
@@ -146,7 +243,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TaskResponse"
+                  "$ref": "#/components/schemas/TaskEnvelope"
                 }
               }
             }
@@ -183,7 +280,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TaskResponse"
+                  "$ref": "#/components/schemas/TaskEnvelope"
                 }
               }
             }
@@ -208,8 +305,15 @@
           }
         ],
         "responses": {
-          "204": {
-            "description": "Task deleted successfully"
+          "200": {
+            "description": "Task deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmptyEnvelope"
+                }
+              }
+            }
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -245,7 +349,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TaskResponse"
+                  "$ref": "#/components/schemas/TaskEnvelope"
                 }
               }
             }
@@ -310,19 +414,175 @@
         "content": {
           "application/json": {
             "schema": {
-              "$ref": "#/components/schemas/ProblemDetails"
+              "$ref": "#/components/schemas/ErrorEnvelope"
             }
           }
         }
       },
       "Unauthorized": {
-        "description": "A valid bearer token is required"
+        "description": "A valid bearer token is required",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
       },
       "NotFound": {
-        "description": "The task was not found"
+        "description": "The task was not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
       }
     },
     "schemas": {
+      "ResponseStatus": {
+        "type": "string",
+        "enum": ["ok", "error"]
+      },
+      "AuthUserEnvelope": {
+        "type": "object",
+        "required": ["data", "code", "status", "message"],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AuthUserResponse"
+          },
+          "code": {
+            "type": "string",
+            "example": "AUTH_LOGIN_OK"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ResponseStatus"
+          },
+          "message": {
+            "type": "string",
+            "example": "Login completed successfully."
+          }
+        }
+      },
+      "TaskEnvelope": {
+        "type": "object",
+        "required": ["data", "code", "status", "message"],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TaskResponse"
+          },
+          "code": {
+            "type": "string",
+            "example": "TASK_RETRIEVED"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ResponseStatus"
+          },
+          "message": {
+            "type": "string",
+            "example": "Task retrieved successfully."
+          }
+        }
+      },
+      "TaskListEnvelope": {
+        "type": "object",
+        "required": ["data", "code", "status", "message"],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TaskListResponse"
+          },
+          "code": {
+            "type": "string",
+            "example": "TASKS_LISTED"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ResponseStatus"
+          },
+          "message": {
+            "type": "string",
+            "example": "Tasks listed successfully."
+          }
+        }
+      },
+      "EmptyEnvelope": {
+        "type": "object",
+        "required": ["data", "code", "status", "message"],
+        "properties": {
+          "data": {
+            "nullable": true
+          },
+          "code": {
+            "type": "string",
+            "example": "TASK_DELETED"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ResponseStatus"
+          },
+          "message": {
+            "type": "string",
+            "example": "Task deleted successfully."
+          }
+        }
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "required": ["data", "code", "status", "message"],
+        "properties": {
+          "data": {
+            "nullable": true
+          },
+          "code": {
+            "type": "string",
+            "example": "TASK_NOT_FOUND"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ResponseStatus"
+          },
+          "message": {
+            "type": "string",
+            "example": "Task was not found."
+          }
+        }
+      },
+      "AuthUserResponse": {
+        "type": "object",
+        "required": ["externalId", "provider"],
+        "properties": {
+          "externalId": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "provider": {
+            "type": "string",
+            "example": "google"
+          }
+        }
+      },
+      "RegisterUserRequest": {
+        "type": "object",
+        "required": ["displayName"],
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          }
+        }
+      },
       "TaskStatus": {
         "type": "string",
         "enum": ["Pending", "In Progress", "Done"]
@@ -448,24 +708,6 @@
         "properties": {
           "status": {
             "$ref": "#/components/schemas/TaskStatus"
-          }
-        }
-      },
-      "ProblemDetails": {
-        "type": "object",
-        "required": ["title", "status"],
-        "properties": {
-          "title": {
-            "type": "string"
-          },
-          "status": {
-            "type": "integer"
-          },
-          "detail": {
-            "type": "string"
-          },
-          "traceId": {
-            "type": "string"
           }
         }
       }

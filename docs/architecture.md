@@ -21,7 +21,8 @@ flowchart LR
 ## System Context
 
 - Users interact with a responsive React web application.
-- Authentication is delegated to an OAuth2/OpenID Connect provider such as Microsoft Entra ID.
+- Authentication is delegated to an OAuth2/OpenID Connect broker such as Microsoft Entra External ID, Azure AD B2C, Auth0, Firebase Auth, or Clerk.
+- Microsoft, Google, and GitHub social providers are configured in the broker, not as separate backend password flows.
 - The frontend sends JWT access tokens to the backend.
 - Azure API Management exposes the public REST API facade.
 - Azure Functions implement task operation endpoints behind API Management.
@@ -37,6 +38,11 @@ Recommended folder structure:
 ```text
 api/
   Functions/
+    Auth/
+      LoginFunction.cs
+      LogoutFunction.cs
+      MeFunction.cs
+      RegisterFunction.cs
     Tasks/
       CreateTaskFunction.cs
       DeleteTaskFunction.cs
@@ -46,6 +52,7 @@ api/
       UpdateTaskStatusFunction.cs
       TaskStatusStreamFunction.cs
   Auth/
+    AuthPrincipal.cs
     JwtOptions.cs
     JwtPrincipalReader.cs
   Domain/
@@ -57,15 +64,28 @@ api/
     TaskQuery.cs
     UpdateTaskRequest.cs
     UpdateTaskStatusRequest.cs
+    Auth/
+      AuthUserResponse.cs
+      RegisterUserRequest.cs
   Factories/
     ITaskFactory.cs
     TaskFactory.cs
   Repositories/
     ITaskRepository.cs
     SqlTaskRepository.cs
+    IUserRepository.cs
+    SqlUserRepository.cs
   Services/
+    IAuthService.cs
+    AuthService.cs
     ITaskService.cs
+    ServiceResponse.cs
+    ServiceResponseStatus.cs
     TaskService.cs
+  Errors/
+    ErrorCatalog.cs
+    ErrorDefinition.cs
+    ServiceCodes.cs
   Program.cs
 ```
 
@@ -90,10 +110,20 @@ Function classes should not contain SQL logic or business rules.
 - Normalize query filters
 - Verify that the caller can access a task
 - Coordinate repository operations
+- Return a standard `ServiceResponse<T>` envelope for success and known errors
+
+`AuthService` owns application auth workflows after the external identity provider has issued a valid token:
+
+- Login/upsert the local user profile
+- Register or update application profile fields
+- Load the current user profile
+- Return logout acknowledgement while token/session clearing happens in the frontend and identity provider
 
 ### Repository Layer
 
 `SqlTaskRepository` is the only component that talks to Azure SQL. It should call stored procedures with parameterized commands and return domain objects or DTO projection models.
+
+`SqlUserRepository` owns user-profile persistence and never stores passwords.
 
 ### Factory Pattern
 
@@ -107,13 +137,15 @@ Function classes should not contain SQL logic or business rules.
 builder.Services.Configure<JwtOptions>(configuration.GetSection("Jwt"));
 builder.Services.AddSingleton<IJwtPrincipalReader, JwtPrincipalReader>();
 builder.Services.AddScoped<ITaskFactory, TaskFactory>();
+builder.Services.AddScoped<IUserRepository, SqlUserRepository>();
+builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITaskService, TaskService>();
 builder.Services.AddScoped<ITaskRepository, SqlTaskRepository>();
 ```
 
 ## Authentication and Authorization
 
-The API uses OAuth2/OpenID Connect access tokens issued by a trusted identity provider.
+The API uses OAuth2/OpenID Connect access tokens issued by a trusted identity broker. The broker can federate Microsoft, Google, and GitHub social login behind one issuer/audience configuration.
 
 JWT validation should verify:
 
@@ -125,8 +157,11 @@ JWT validation should verify:
 
 The application should use stable subject claims for ownership:
 
+- `ExternalId`: `sub`, `oid`, or `nameidentifier` claim
 - `createdBy`: subject claim of the user who created the task
 - `assignedTo`: subject or email of the assigned user
+
+The backend does not implement username/password authentication. `/auth/register` stores only the local application profile linked to the external identity.
 
 Authorization rule:
 
@@ -154,6 +189,22 @@ CREATE TABLE dbo.Tasks
 );
 ```
 
+User profiles:
+
+```sql
+CREATE TABLE dbo.Users
+(
+    Id UNIQUEIDENTIFIER NOT NULL CONSTRAINT PK_Users PRIMARY KEY,
+    ExternalId NVARCHAR(200) NOT NULL UNIQUE,
+    Email NVARCHAR(320) NULL,
+    DisplayName NVARCHAR(200) NULL,
+    Provider NVARCHAR(60) NOT NULL,
+    CreatedAt DATETIME2 NOT NULL,
+    UpdatedAt DATETIME2 NOT NULL,
+    RowVersion ROWVERSION NOT NULL
+);
+```
+
 Recommended indexes:
 
 ```sql
@@ -164,6 +215,8 @@ CREATE INDEX IX_Tasks_Status_DueDate ON dbo.Tasks (Status, DueDate);
 
 Stored procedures should cover:
 
+- `dbo.User_Upsert`
+- `dbo.User_GetByExternalId`
 - `dbo.Task_Create`
 - `dbo.Task_GetById`
 - `dbo.Task_List`
@@ -190,13 +243,39 @@ PUT    /api/tasks/{id}
 PATCH  /api/tasks/{id}/status
 DELETE /api/tasks/{id}
 GET    /api/tasks/stream
+POST   /api/auth/login
+POST   /api/auth/logout
+POST   /api/auth/register
+GET    /api/auth/me
 ```
 
-Common response codes:
+All JSON API responses use the same envelope:
+
+```json
+{
+  "data": {},
+  "code": "TASK_RETRIEVED",
+  "status": "ok",
+  "message": "Task retrieved successfully."
+}
+```
+
+Known errors use the same shape:
+
+```json
+{
+  "data": null,
+  "code": "TASK_NOT_FOUND",
+  "status": "error",
+  "message": "Task was not found."
+}
+```
+
+Common HTTP response codes:
 
 - `200 OK`: successful read or update
 - `201 Created`: successful create
-- `204 No Content`: successful delete
+- `200 OK`: successful delete with an empty success envelope
 - `400 Bad Request`: validation failure
 - `401 Unauthorized`: missing or invalid token
 - `403 Forbidden`: valid token without access to the task
@@ -268,7 +347,10 @@ Frontend principles:
 
 Backend:
 
-- Return problem-style JSON for validation and domain errors.
+- Keep known application errors in `ErrorCatalog` so codes/messages are consistent across services and functions.
+- Return `ServiceResponse<T>` from application services with `{ data, code, status, message }`.
+- Map service envelopes to HTTP status codes in the Azure Function boundary.
+- Keep authentication errors in the security/function boundary through `IJwtPrincipalReader`.
 - Log unexpected exceptions with correlation IDs.
 - Avoid leaking database or token-validation internals to clients.
 
