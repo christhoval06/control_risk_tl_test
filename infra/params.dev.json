@@ -1,0 +1,35 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": {
+      "value": "dev"
+    },
+    "location": {
+      "value": "eastus"
+    },
+    "appName": {
+      "value": "taskmgmt"
+    },
+    "allowedOrigins": {
+      "value": [
+        "http://localhost:5173"
+      ]
+    },
+    "apimPublisherEmail": {
+      "value": "api-owner@example.com"
+    },
+    "apimPublisherName": {
+      "value": "Task Management"
+    },
+    "jwtAuthority": {
+      "value": "https://login.microsoftonline.com/<tenant-id>/v2.0"
+    },
+    "jwtAudience": {
+      "value": "api://<api-client-id>"
+    },
+    "sqlAdministratorLogin": {
+      "value": "sqladminuser"
+    }
+  }
+}

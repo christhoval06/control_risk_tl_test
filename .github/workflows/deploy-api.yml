@@ -1,0 +1,168 @@
+name: deploy-api
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'GitHub environment to deploy.'
+        required: true
+        default: dev
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      location:
+        description: 'Azure region.'
+        required: true
+        default: eastus
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      RESOURCE_GROUP: rg-task-management-${{ inputs.environment }}
+      LOCATION: ${{ inputs.location }}
+      ENVIRONMENT_NAME: ${{ inputs.environment }}
+      APP_NAME: taskmgmt
+      SQL_ADMIN_LOGIN: ${{ vars.SQL_ADMIN_LOGIN }}
+      SQL_ADMIN_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD }}
+      JWT_AUTHORITY: ${{ vars.JWT_AUTHORITY }}
+      JWT_AUDIENCE: ${{ vars.JWT_AUDIENCE }}
+      CORS_ALLOWED_ORIGINS: ${{ vars.CORS_ALLOWED_ORIGINS }}
+      APIM_PUBLISHER_EMAIL: ${{ vars.APIM_PUBLISHER_EMAIL }}
+      APIM_PUBLISHER_NAME: ${{ vars.APIM_PUBLISHER_NAME }}
+      DEPLOYMENT_NAME: api-${{ inputs.environment }}-${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Validate required deployment settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SQL_ADMIN_LOGIN"
+          test -n "$SQL_ADMIN_PASSWORD"
+          test -n "$JWT_AUTHORITY"
+          test -n "$JWT_AUDIENCE"
+          test -n "$CORS_ALLOWED_ORIGINS"
+          test -n "$APIM_PUBLISHER_EMAIL"
+          test -n "$APIM_PUBLISHER_NAME"
+
+      - name: Ensure resource group exists
+        run: |
+          az group create \
+            --name "$RESOURCE_GROUP" \
+            --location "$LOCATION"
+
+      - name: Deploy Azure infrastructure
+        id: infra
+        run: |
+          set -euo pipefail
+          az deployment group create \
+            --name "$DEPLOYMENT_NAME" \
+            --resource-group "$RESOURCE_GROUP" \
+            --template-file infra/main.bicep \
+            --parameters \
+              environmentName="$ENVIRONMENT_NAME" \
+              location="$LOCATION" \
+              appName="$APP_NAME" \
+              sqlAdministratorLogin="$SQL_ADMIN_LOGIN" \
+              sqlAdministratorPassword="$SQL_ADMIN_PASSWORD" \
+              apimPublisherEmail="$APIM_PUBLISHER_EMAIL" \
+              apimPublisherName="$APIM_PUBLISHER_NAME" \
+              jwtAuthority="$JWT_AUTHORITY" \
+              jwtAudience="$JWT_AUDIENCE" \
+              allowedOrigins="$CORS_ALLOWED_ORIGINS"
+
+          echo "function_app_name=$(az deployment group show --resource-group "$RESOURCE_GROUP" --name "$DEPLOYMENT_NAME" --query properties.outputs.functionAppName.value -o tsv)" >> "$GITHUB_OUTPUT"
+          echo "api_management_api_url=$(az deployment group show --resource-group "$RESOURCE_GROUP" --name "$DEPLOYMENT_NAME" --query properties.outputs.apiManagementApiUrl.value -o tsv)" >> "$GITHUB_OUTPUT"
+          echo "sql_server_name=$(az deployment group show --resource-group "$RESOURCE_GROUP" --name "$DEPLOYMENT_NAME" --query properties.outputs.sqlServerName.value -o tsv)" >> "$GITHUB_OUTPUT"
+          echo "sql_server_fqdn=$(az deployment group show --resource-group "$RESOURCE_GROUP" --name "$DEPLOYMENT_NAME" --query properties.outputs.sqlServerFullyQualifiedDomainName.value -o tsv)" >> "$GITHUB_OUTPUT"
+          echo "sql_database_name=$(az deployment group show --resource-group "$RESOURCE_GROUP" --name "$DEPLOYMENT_NAME" --query properties.outputs.sqlDatabaseName.value -o tsv)" >> "$GITHUB_OUTPUT"
+
+      - name: Build Azure Functions package
+        run: |
+          dotnet restore TaskManagement.sln
+          dotnet test tests/TaskManagement.Tests.csproj --configuration Release
+          dotnet publish api/TaskManagement.Api.csproj --configuration Release --output publish/api
+          cd publish/api
+          zip -r ../api.zip .
+
+      - name: Deploy Azure Functions package
+        run: |
+          az functionapp deployment source config-zip \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "${{ steps.infra.outputs.function_app_name }}" \
+            --src publish/api.zip
+
+      - name: Install sqlcmd
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc >/dev/null
+          curl -fsSL https://packages.microsoft.com/config/ubuntu/22.04/prod.list | sudo tee /etc/apt/sources.list.d/msprod.list >/dev/null
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y apt-get install -y mssql-tools18 unixodbc-dev
+          echo '/opt/mssql-tools18/bin' >> "$GITHUB_PATH"
+
+      - name: Open temporary SQL firewall rule
+        id: runner_ip
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUNNER_IP="$(curl -fsSL https://api.ipify.org)"
+          echo "ip=$RUNNER_IP" >> "$GITHUB_OUTPUT"
+          az sql server firewall-rule create \
+            --resource-group "$RESOURCE_GROUP" \
+            --server "${{ steps.infra.outputs.sql_server_name }}" \
+            --name github-actions-${{ github.run_id }} \
+            --start-ip-address "$RUNNER_IP" \
+            --end-ip-address "$RUNNER_IP"
+
+      - name: Apply SQL scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          sqlcmd -C \
+            -S "${{ steps.infra.outputs.sql_server_fqdn }}" \
+            -d "${{ steps.infra.outputs.sql_database_name }}" \
+            -U "$SQL_ADMIN_LOGIN" \
+            -P "$SQL_ADMIN_PASSWORD" \
+            -i sql/001_schema.sql
+          sqlcmd -C \
+            -S "${{ steps.infra.outputs.sql_server_fqdn }}" \
+            -d "${{ steps.infra.outputs.sql_database_name }}" \
+            -U "$SQL_ADMIN_LOGIN" \
+            -P "$SQL_ADMIN_PASSWORD" \
+            -i sql/002_stored_procedures.sql
+
+      - name: Remove temporary SQL firewall rule
+        if: always() && steps.runner_ip.outputs.ip != ''
+        run: |
+          az sql server firewall-rule delete \
+            --resource-group "$RESOURCE_GROUP" \
+            --server "${{ steps.infra.outputs.sql_server_name }}" \
+            --name github-actions-${{ github.run_id }}
+
+      - name: Deployment summary
+        run: |
+          echo "### API deployed" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Function App: \`${{ steps.infra.outputs.function_app_name }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- API Management URL: ${{ steps.infra.outputs.api_management_api_url }}" >> "$GITHUB_STEP_SUMMARY"

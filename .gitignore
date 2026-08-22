@@ -1,0 +1,59 @@
+# .NET
+bin/
+obj/
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+*.nupkg
+*.snupkg
+
+# Local .NET/NuGet state used by this workspace
+.dotnet/
+.nuget/
+.home/
+.local/
+
+# Azure Functions local state and secrets
+local.settings.json
+api/local.settings.json
+api/.azurefunctions/
+api/.local/
+api/Library/
+
+# Azure CLI / IaC generated output
+.azure/
+infra/main.json
+infra/*.local.json
+
+# Node / pnpm
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.pnpm-store/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.vite/
+.vite-temp/
+
+# Generated API client
+client/src/__generated__/
+
+# Build/deploy artifacts
+publish/
+*.zip
+
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
+*.swp
