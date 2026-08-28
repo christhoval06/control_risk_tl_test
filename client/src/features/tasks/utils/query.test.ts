@@ -10,7 +10,7 @@ describe('normalizeTaskQuery', () => {
       sortBy: 'unknown',
       sortDirection: 'sideways',
       page: 0,
-      pageSize: 500
+      pageSize: 500,
     });
 
     expect(query).toEqual({
@@ -18,7 +18,7 @@ describe('normalizeTaskQuery', () => {
       sortBy: 'dueDate',
       sortDirection: 'asc',
       page: 1,
-      pageSize: 100
+      pageSize: 100,
     });
   });
 });

@@ -17,7 +17,7 @@ describe('Select', () => {
           <SelectItem value="Pending">Pending</SelectItem>
           <SelectItem value="Done">Done</SelectItem>
         </SelectContent>
-      </Select>
+      </Select>,
     );
 
     await userEvent.click(screen.getByRole('combobox', { name: 'Status' }));

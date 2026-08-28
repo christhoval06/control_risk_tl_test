@@ -44,54 +44,57 @@ function AuthSessionProvider({ children }: { children: ReactNode }) {
   const token = sessionToken || normalizeBearerToken(authHeader);
   const account = sessionAccount ?? authUser ?? null;
 
-  const value = useMemo<AuthContextValue>(() => ({
-    token,
-    account,
-    isMsalReady: Boolean(msalClient && isMsalConfigured()),
-    login: async () => {
-      if (!msalClient) return '';
-      if (loginPromiseRef.current) {
-        return loginPromiseRef.current;
-      }
-
-      loginPromiseRef.current = (async () => {
-        await msalClient.initialize();
-        const loginResult = await msalClient.loginPopup({
-          scopes: [authScope],
-          overrideInteractionInProgress: true
-        });
-        const tokenResult = await msalClient.acquireTokenSilent({
-          account: loginResult.account,
-          scopes: [authScope]
-        });
-        const nextAccount = {
-          username: loginResult.account.username,
-          account: loginResult.account
-        };
-        const didSignIn = signIn({
-          auth: { token: tokenResult.accessToken, type: 'Bearer' },
-          userState: nextAccount
-        });
-        if (!didSignIn) {
-          throw new Error('Unable to store Microsoft Entra session.');
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      token,
+      account,
+      isMsalReady: Boolean(msalClient && isMsalConfigured()),
+      login: async () => {
+        if (!msalClient) return '';
+        if (loginPromiseRef.current) {
+          return loginPromiseRef.current;
         }
 
-        setSessionToken(tokenResult.accessToken);
-        setSessionAccount(nextAccount);
-        return tokenResult.accessToken;
-      })().finally(() => {
-        loginPromiseRef.current = null;
-      });
+        loginPromiseRef.current = (async () => {
+          await msalClient.initialize();
+          const loginResult = await msalClient.loginPopup({
+            scopes: [authScope],
+            overrideInteractionInProgress: true,
+          });
+          const tokenResult = await msalClient.acquireTokenSilent({
+            account: loginResult.account,
+            scopes: [authScope],
+          });
+          const nextAccount = {
+            username: loginResult.account.username,
+            account: loginResult.account,
+          };
+          const didSignIn = signIn({
+            auth: { token: tokenResult.accessToken, type: 'Bearer' },
+            userState: nextAccount,
+          });
+          if (!didSignIn) {
+            throw new Error('Unable to store Microsoft Entra session.');
+          }
 
-      return loginPromiseRef.current;
-    },
-    logout: async () => {
-      signOut();
-      setSessionToken('');
-      setSessionAccount(null);
-      await msalClient?.logoutPopup();
-    }
-  }), [account, authHeader, msalClient, sessionToken, signIn, signOut, token]);
+          setSessionToken(tokenResult.accessToken);
+          setSessionAccount(nextAccount);
+          return tokenResult.accessToken;
+        })().finally(() => {
+          loginPromiseRef.current = null;
+        });
+
+        return loginPromiseRef.current;
+      },
+      logout: async () => {
+        signOut();
+        setSessionToken('');
+        setSessionAccount(null);
+        await msalClient?.logoutPopup();
+      },
+    }),
+    [account, authHeader, msalClient, sessionToken, signIn, signOut, token],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

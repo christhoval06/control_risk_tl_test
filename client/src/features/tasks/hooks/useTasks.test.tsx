@@ -12,28 +12,28 @@ const generated = vi.hoisted(() => ({
   updateStatus: vi.fn(),
   remove: vi.fn(),
   refetch: vi.fn(),
-  toast: vi.fn()
+  toast: vi.fn(),
 }));
 
 vi.mock('@api/hooks/default/useListTasks', () => ({
   listTasksQueryKey: ({ query }: { query?: unknown } = {}) => [{ url: '/tasks' }, ...(query ? [query] : [])],
-  useListTasks: generated.list
+  useListTasks: generated.list,
 }));
 
 vi.mock('@api/hooks/default/useCreateTask', () => ({
-  useCreateTask: generated.create
+  useCreateTask: generated.create,
 }));
 
 vi.mock('@api/hooks/default/useUpdateTaskStatus', () => ({
-  useUpdateTaskStatus: generated.updateStatus
+  useUpdateTaskStatus: generated.updateStatus,
 }));
 
 vi.mock('@api/hooks/default/useDeleteTask', () => ({
-  useDeleteTask: generated.remove
+  useDeleteTask: generated.remove,
 }));
 
 vi.mock('@hooks/useToast', () => ({
-  useToast: () => ({ toast: generated.toast })
+  useToast: () => ({ toast: generated.toast }),
 }));
 
 const task: TaskItem = {
@@ -45,7 +45,7 @@ const task: TaskItem = {
   createdBy: 'owner-1',
   assignedTo: 'Ana',
   createdAt: '2026-08-21T12:00:00Z',
-  updatedAt: '2026-08-21T12:00:00Z'
+  updatedAt: '2026-08-21T12:00:00Z',
 };
 
 describe('useTasks', () => {
@@ -56,16 +56,33 @@ describe('useTasks', () => {
     useTaskStore.getState().reset();
     generated.toast.mockClear();
     generated.refetch.mockResolvedValue({
-      data: { data: { items: [task], page: 1, pageSize: 20 }, code: 'TASKS_LISTED', status: 'ok', message: 'Tasks listed successfully.' }
+      data: {
+        data: { items: [task], page: 1, pageSize: 20 },
+        code: 'TASKS_LISTED',
+        status: 'ok',
+        message: 'Tasks listed successfully.',
+      },
     });
     generated.list.mockReturnValue({
-      data: { data: { items: [task], page: 1, pageSize: 20 }, code: 'TASKS_LISTED', status: 'ok', message: 'Tasks listed successfully.' },
+      data: {
+        data: { items: [task], page: 1, pageSize: 20 },
+        code: 'TASKS_LISTED',
+        status: 'ok',
+        message: 'Tasks listed successfully.',
+      },
       isFetching: false,
       isError: false,
-      refetch: generated.refetch
+      refetch: generated.refetch,
     });
-    generated.create.mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue(task), isPending: false, isError: false });
-    generated.updateStatus.mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue({ ...task, status: 'Done' }), isError: false });
+    generated.create.mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue(task),
+      isPending: false,
+      isError: false,
+    });
+    generated.updateStatus.mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({ ...task, status: 'Done' }),
+      isError: false,
+    });
     generated.remove.mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue(undefined), isError: false });
   });
 
@@ -79,7 +96,7 @@ describe('useTasks', () => {
     expect(result.current.tasks).toEqual([task]);
     expect(generated.list).toHaveBeenCalledWith(
       { query: expect.objectContaining({ sortBy: 'dueDate' }) },
-      expect.objectContaining({ client: expect.objectContaining({ auth: 'access-token' }) })
+      expect.objectContaining({ client: expect.objectContaining({ auth: 'access-token' }) }),
     );
 
     await act(async () => {
@@ -89,15 +106,29 @@ describe('useTasks', () => {
     });
 
     expect(generated.create().mutateAsync).toHaveBeenCalledWith({ body: input });
-    expect(generated.updateStatus().mutateAsync).toHaveBeenCalledWith({ path: { id: task.id }, body: { status: 'Done' } });
+    expect(generated.updateStatus().mutateAsync).toHaveBeenCalledWith({
+      path: { id: task.id },
+      body: { status: 'Done' },
+    });
     expect(generated.remove().mutateAsync).toHaveBeenCalledWith({ path: { id: task.id } });
-    expect(generated.toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Task created', variant: 'success' }));
+    expect(generated.toast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Task created', variant: 'success' }),
+    );
     expect(generated.toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Task moved', variant: 'success' }));
-    expect(generated.toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Task deleted', variant: 'success' }));
+    expect(generated.toast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Task deleted', variant: 'success' }),
+    );
   });
 
   it('notifies the user when a task operation fails', async () => {
-    const create = { mutateAsync: vi.fn().mockRejectedValue(new Error('failed')), isPending: false, isError: false };
+    const create = {
+      mutateAsync: vi.fn().mockRejectedValue({
+        status: 400,
+        data: { code: 'TASK_TITLE_REQUIRED', status: 'error', message: 'Task title is required.', data: null },
+      }),
+      isPending: false,
+      isError: false,
+    };
     generated.create.mockReturnValue(create);
     const wrapper = ({ children }: PropsWithChildren) => (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -108,9 +139,12 @@ describe('useTasks', () => {
       await result.current.submitTask({ title: task.title });
     });
 
-    expect(generated.toast).toHaveBeenCalledWith(expect.objectContaining({
-      title: 'Unable to save task',
-      variant: 'error'
-    }));
+    expect(generated.toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Unable to save task',
+        description: 'Task title is required.',
+        variant: 'error',
+      }),
+    );
   });
 });

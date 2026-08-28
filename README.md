@@ -139,6 +139,8 @@ sql/001_schema.sql
 sql/002_stored_procedures.sql
 ```
 
+The API Dockerfile uses the .NET 10 SDK image and installs Azure Functions Core Tools from Microsoft's apt package feed because the Azure Functions .NET isolated base image does not currently publish a `4-dotnet-isolated10.0` tag for this local build path.
+
 Local container URLs:
 
 ```text

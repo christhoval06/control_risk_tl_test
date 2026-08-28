@@ -8,7 +8,7 @@ const task: TaskItem = {
   status: 'Pending',
   createdBy: 'user-1',
   createdAt: '2026-08-22T00:00:00Z',
-  updatedAt: '2026-08-22T00:00:00Z'
+  updatedAt: '2026-08-22T00:00:00Z',
 };
 
 describe('useTaskStore', () => {
@@ -24,7 +24,7 @@ describe('useTaskStore', () => {
     expect(useTaskStore.getState().query).toMatchObject({
       search: 'invoice',
       page: 1,
-      pageSize: 20
+      pageSize: 20,
     });
   });
 

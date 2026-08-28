@@ -2,16 +2,16 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import type { ComponentProps } from 'react';
 import { cn } from '@utils/cn';
 
-export const labelVariants = cva('block text-sm font-semibold text-slate-700', {
+export const labelVariants = cva('block text-sm font-semibold text-slate-700 dark:text-slate-300', {
   variants: {
     spacing: {
       default: 'mb-2',
-      none: ''
-    }
+      none: '',
+    },
   },
   defaultVariants: {
-    spacing: 'default'
-  }
+    spacing: 'default',
+  },
 });
 
 export interface LabelProps extends ComponentProps<'label'>, VariantProps<typeof labelVariants> {}

@@ -10,10 +10,13 @@ export function useRegisterPage() {
   const { token, account } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const registerMutation = useRegister({ client: { baseURL: apiBaseUrl, auth: token } });
-  const defaultValues = useMemo<RegisterUserRequest>(() => ({
-    displayName: account?.username ?? '',
-    email: account?.username ?? ''
-  }), [account?.username]);
+  const defaultValues = useMemo<RegisterUserRequest>(
+    () => ({
+      displayName: account?.username ?? '',
+      email: account?.username ?? '',
+    }),
+    [account?.username],
+  );
 
   const submit = async (values: RegisterUserRequest) => {
     setError(null);
@@ -21,8 +24,8 @@ export function useRegisterPage() {
       await registerMutation.mutateAsync({
         body: {
           displayName: values.displayName.trim(),
-          email: values.email?.trim() || undefined
-        }
+          email: values.email?.trim() || undefined,
+        },
       });
       navigate('/tasks');
     } catch {
@@ -35,6 +38,6 @@ export function useRegisterPage() {
     defaultValues,
     error,
     isSaving: registerMutation.isPending,
-    submit
+    submit,
   };
 }

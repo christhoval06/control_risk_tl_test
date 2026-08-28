@@ -72,7 +72,11 @@ export const Modal: React.FC<ModalProps> = React.memo(
 
             <motion.div
               ref={modalRef}
-              className={cn('relative max-h-[80vh] w-full max-w-2xl rounded-lg bg-white shadow-xl', { 'overflow-y-auto': scrollable }, className)}
+              className={cn(
+                'relative max-h-[80vh] w-full max-w-2xl rounded-lg bg-white shadow-xl',
+                { 'overflow-y-auto': scrollable },
+                className,
+              )}
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -82,14 +86,21 @@ export const Modal: React.FC<ModalProps> = React.memo(
               aria-labelledby={title ? 'modal-title' : undefined}
               tabIndex={-1}
             >
-              <button aria-label="Close modal" type="button" onClick={onClose} className="text-slate-500 hover:text-slate-600 absolute top-4 right-4 transition-colors">
+              <button
+                aria-label="Close modal"
+                type="button"
+                onClick={onClose}
+                className="text-slate-500 hover:text-slate-600 absolute top-4 right-4 transition-colors"
+              >
                 <X size={24} />
               </button>
 
               {showHeader && (
                 <div className="border-slate-200 flex items-center justify-between border-b p-5">
-                  <h2 className="text-slate-800 text-xl font-bold" id="modal-title">{title}</h2>
-                  <p className='mt-1 text-sm text-slate-500'>{description}</p>
+                  <h2 className="text-slate-800 text-xl font-bold" id="modal-title">
+                    {title}
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">{description}</p>
                   <div onClick={onClose} className="size-6 rounded-full p-1 transition-colors"></div>
                 </div>
               )}

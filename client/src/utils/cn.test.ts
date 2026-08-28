@@ -3,6 +3,8 @@ import { cn } from './cn';
 
 describe('cn', () => {
   it('joins conditional class names and resolves Tailwind conflicts', () => {
-    expect(cn('px-2 text-sm', false && 'hidden', ['px-4', 'font-semibold'])).toBe('text-sm px-4 font-semibold');
+    const hiddenClass = undefined;
+
+    expect(cn('px-2 text-sm', hiddenClass, ['px-4', 'font-semibold'])).toBe('text-sm px-4 font-semibold');
   });
 });

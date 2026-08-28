@@ -19,11 +19,11 @@ export function createMsalClient() {
     auth: {
       clientId,
       authority,
-      redirectUri
+      redirectUri,
     },
     cache: {
-      cacheLocation: 'sessionStorage'
-    }
+      cacheLocation: 'sessionStorage',
+    },
   };
 
   return new PublicClientApplication(config);

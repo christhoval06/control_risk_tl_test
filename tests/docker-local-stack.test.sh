@@ -36,8 +36,19 @@ assert_file_contains "$COMPOSE_FILE" "1433:1433"
 assert_file_contains "$COMPOSE_FILE" "6379:6379"
 
 assert_file_contains "$DOCKERFILE" "FROM mcr.microsoft.com/dotnet/sdk:10.0"
-assert_file_contains "$DOCKERFILE" "FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated10.0"
+assert_file_contains "$DOCKERFILE" "packages.microsoft.com/config/ubuntu"
+assert_file_contains "$DOCKERFILE" "azure-functions-core-tools-4"
+assert_file_contains "$DOCKERFILE" "FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT=1"
+assert_file_contains "$DOCKERFILE" '"func", "start", "--port", "80"'
 assert_file_contains "$DOCKERFILE" "dotnet publish"
+
+if grep -Fq "azure-functions/dotnet-isolated:4-dotnet-isolated10.0" "$DOCKERFILE"; then
+  fail "Dockerfile should not use the unavailable dotnet-isolated10.0 Functions base image"
+fi
+
+if grep -Fq "npm install -g azure-functions-core-tools@4" "$DOCKERFILE"; then
+  fail "Dockerfile should install Azure Functions Core Tools from apt, not npm"
+fi
 
 assert_file_contains "$SQL_INIT_SCRIPT" "CREATE DATABASE [TaskManagement]"
 assert_file_contains "$SQL_INIT_SCRIPT" "001_schema.sql"

@@ -3,11 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { Component as AuthCallbackPage } from './AuthCallbackPage';
 
 const redirectBridge = vi.hoisted(() => ({
-  broadcastResponseToMainFrame: vi.fn()
+  broadcastResponseToMainFrame: vi.fn(),
 }));
 
 vi.mock('@azure/msal-browser/redirect-bridge', () => ({
-  broadcastResponseToMainFrame: redirectBridge.broadcastResponseToMainFrame
+  broadcastResponseToMainFrame: redirectBridge.broadcastResponseToMainFrame,
 }));
 
 describe('AuthCallbackPage', () => {

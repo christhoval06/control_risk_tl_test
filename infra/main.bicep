@@ -44,6 +44,33 @@ param functionPlanSku string = environmentName == 'prod' ? 'EP1' : 'FC1'
 @description('Azure Functions hosting plan tier. Match the selected SKU, such as FlexConsumption for FC1, ElasticPremium for EP1, Basic for B1, or Dynamic for Y1.')
 param functionPlanTier string = environmentName == 'prod' ? 'ElasticPremium' : 'FlexConsumption'
 
+@description('Enable Redis-backed API response caching.')
+param cacheEnabled bool = true
+
+@allowed([
+  'Basic'
+  'Standard'
+  'Premium'
+])
+@description('Azure Cache for Redis SKU name. Basic C0 is the lowest-cost option for dev.')
+param redisSkuName string = environmentName == 'prod' ? 'Standard' : 'Basic'
+
+@allowed([
+  'C'
+  'P'
+])
+@description('Azure Cache for Redis SKU family. Use C for Basic/Standard and P for Premium.')
+param redisSkuFamily string = 'C'
+
+@minValue(0)
+@maxValue(6)
+@description('Azure Cache for Redis capacity. 0 maps to C0 for Basic/Standard.')
+param redisCapacity int = environmentName == 'prod' ? 1 : 0
+
+@minValue(1)
+@description('Default API cache TTL in seconds.')
+param cacheDefaultTtlSeconds int = 60
+
 var suffix = uniqueString(resourceGroup().id, appName, environmentName)
 var normalizedAppName = toLower('${appName}-${environmentName}-${suffix}')
 var storageAccountPrefix = take(replace(toLower('st${appName}${environmentName}'), '-', ''), 11)
@@ -59,6 +86,7 @@ var apiManagementApiName = 'task-management-api'
 var apiManagementAllowedOriginsPolicy = join(map(allowedOrigins, origin => '<origin>${origin}</origin>'), '')
 var sqlServerName = 'sql-${normalizedAppName}'
 var sqlDatabaseName = 'TaskManagement'
+var redisName = 'redis-${normalizedAppName}'
 
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageAccountName
@@ -142,6 +170,21 @@ resource sqlDatabase 'Microsoft.Sql/servers/databases@2023-08-01' = {
   }
 }
 
+resource redis 'Microsoft.Cache/redis@2024-03-01' = if (cacheEnabled) {
+  name: redisName
+  location: location
+  properties: {
+    enableNonSslPort: false
+    minimumTlsVersion: '1.2'
+    publicNetworkAccess: 'Enabled'
+    sku: {
+      name: redisSkuName
+      family: redisSkuFamily
+      capacity: redisCapacity
+    }
+  }
+}
+
 resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
   name: functionAppName
   location: location
@@ -200,6 +243,18 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         {
           name: 'Cors__AllowedOrigins'
           value: join(allowedOrigins, ',')
+        }
+        {
+          name: 'Redis__ConnectionString'
+          value: cacheEnabled ? '${redis!.properties.hostName}:${redis!.properties.sslPort},password=${redis!.listKeys().primaryKey},ssl=True,abortConnect=False' : ''
+        }
+        {
+          name: 'Cache__Enabled'
+          value: string(cacheEnabled)
+        }
+        {
+          name: 'Cache__DefaultTtlSeconds'
+          value: string(cacheDefaultTtlSeconds)
         }
       ]
     }
@@ -263,3 +318,5 @@ output apiManagementApiUrl string = '${apiManagementGatewayUrl}/${apiManagementA
 output sqlServerName string = sqlServer.name
 output sqlServerFullyQualifiedDomainName string = sqlServer.properties.fullyQualifiedDomainName
 output sqlDatabaseName string = sqlDatabase.name
+output redisName string = cacheEnabled ? redis!.name : ''
+output redisHostName string = cacheEnabled ? redis!.properties.hostName : ''

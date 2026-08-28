@@ -10,23 +10,30 @@ export function useTaskBoard() {
   const { token } = useAuth();
   const board = useTasks(token);
   const updateTaskStatus = useTaskStore((state) => state.updateTaskStatus);
-  const applyStatusEvent = useCallback((event: { id: string; status: Parameters<typeof updateTaskStatus>[1] }) => {
-    updateTaskStatus(event.id, event.status);
-  }, [updateTaskStatus]);
+  const applyStatusEvent = useCallback(
+    (event: { id: string; status: Parameters<typeof updateTaskStatus>[1] }) => {
+      updateTaskStatus(event.id, event.status);
+    },
+    [updateTaskStatus],
+  );
 
   useTaskStatusStream(token, applyStatusEvent);
 
-  const tasksByStatus = useMemo(() => Object.fromEntries(
-    taskStatuses.map((status) => [
-      status,
-      board.tasks.filter((task) => task.status === status)
-    ])
-  ) as Record<TaskStatus, typeof board.tasks>, [board.tasks]);
+  const tasksByStatus = useMemo(
+    () =>
+      Object.fromEntries(
+        taskStatuses.map((status) => [status, board.tasks.filter((task) => task.status === status)]),
+      ) as Record<TaskStatus, typeof board.tasks>,
+    [board.tasks],
+  );
   const taskById = useMemo(() => new Map(board.tasks.map((task) => [task.id, task])), [board.tasks]);
 
-  return useMemo(() => ({
-    ...board,
-    taskById,
-    tasksByStatus
-  }), [board, taskById, tasksByStatus]);
+  return useMemo(
+    () => ({
+      ...board,
+      taskById,
+      tasksByStatus,
+    }),
+    [board, taskById, tasksByStatus],
+  );
 }

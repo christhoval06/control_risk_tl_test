@@ -7,20 +7,20 @@ export default defineConfig({
   input: '../docs/swagger.json',
   output: {
     path: './src/__generated__',
-    clean: true
+    clean: true,
   },
   plugins: [
     pluginTs({ output: { path: 'types.ts' } }),
     pluginAxios({
       output: { path: 'client', mode: 'directory' },
-      group: { type: 'tag' }
+      group: { type: 'tag' },
     }),
     pluginReactQuery({
       output: { path: 'hooks', mode: 'directory' },
       group: { type: 'tag' },
       client: 'axios',
       hooks: true,
-      exclude: [{ type: 'operationId', pattern: 'streamTaskStatusUpdates' }]
-    })
-  ]
+      exclude: [{ type: 'operationId', pattern: 'streamTaskStatusUpdates' }],
+    }),
+  ],
 });

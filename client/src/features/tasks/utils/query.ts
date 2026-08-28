@@ -15,7 +15,7 @@ export function normalizeTaskQuery(query: TaskQuery): NormalizedTaskQuery {
     sortBy,
     sortDirection: query.sortDirection === 'desc' ? 'desc' : 'asc',
     page: Math.max(1, query.page ?? 1),
-    pageSize: Math.min(100, Math.max(1, query.pageSize ?? 20))
+    pageSize: Math.min(100, Math.max(1, query.pageSize ?? 20)),
   });
 }
 
@@ -25,7 +25,5 @@ function cleanText(value?: string): string | undefined {
 }
 
 function stripUndefined(query: NormalizedTaskQuery): NormalizedTaskQuery {
-  return Object.fromEntries(
-    Object.entries(query).filter(([, value]) => value !== undefined)
-  ) as NormalizedTaskQuery;
+  return Object.fromEntries(Object.entries(query).filter(([, value]) => value !== undefined)) as NormalizedTaskQuery;
 }

@@ -2,7 +2,7 @@ import type {
   CreateTaskRequest,
   TaskListResponse as GeneratedTaskListResponse,
   TaskResponse,
-  TaskStatusKey
+  TaskStatusKey,
 } from '@api/types';
 
 export type TaskStatus = TaskStatusKey;

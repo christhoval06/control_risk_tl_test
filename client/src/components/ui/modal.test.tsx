@@ -8,7 +8,7 @@ describe('Modal', () => {
     render(
       <Modal isOpen title="Create task" onClose={vi.fn()}>
         <p>Task form</p>
-      </Modal>
+      </Modal>,
     );
 
     expect(screen.getByRole('dialog', { name: 'Create task' })).toBeInTheDocument();
@@ -20,7 +20,7 @@ describe('Modal', () => {
     render(
       <Modal isOpen title="Create task" onClose={onClose}>
         <p>Task form</p>
-      </Modal>
+      </Modal>,
     );
 
     await userEvent.keyboard('{Escape}');

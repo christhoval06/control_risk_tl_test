@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@routes/AuthGate', () => ({
-  AuthGate: () => null
+  AuthGate: () => null,
 }));
 
 import { appRoutes } from './AppRoutes';

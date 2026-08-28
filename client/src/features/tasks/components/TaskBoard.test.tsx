@@ -8,19 +8,19 @@ const board = vi.hoisted(() => ({
   changeStatus: vi.fn(),
   removeTask: vi.fn(),
   state: {
-    isLoading: false
-  }
+    isLoading: false,
+  },
 }));
 
 const tasks: TaskItem[] = [
   task({ id: '1', title: 'Review risk register', status: 'Pending' }),
   task({ id: '2', title: 'Assign control owner', status: 'In Progress' }),
-  task({ id: '3', title: 'Archive evidence', status: 'Done' })
+  task({ id: '3', title: 'Archive evidence', status: 'Done' }),
 ];
 const tasksByStatus = {
   Pending: tasks.filter((task) => task.status === 'Pending'),
   'In Progress': tasks.filter((task) => task.status === 'In Progress'),
-  Done: tasks.filter((task) => task.status === 'Done')
+  Done: tasks.filter((task) => task.status === 'Done'),
 };
 const taskById = new Map(tasks.map((task) => [task.id, task]));
 
@@ -37,8 +37,8 @@ vi.mock('@features/tasks/hooks/useTaskBoard', () => ({
     loadTasks: vi.fn(),
     submitTask: vi.fn(),
     changeStatus: board.changeStatus,
-    removeTask: board.removeTask
-  })
+    removeTask: board.removeTask,
+  }),
 }));
 
 describe('TaskBoard', () => {
@@ -109,7 +109,7 @@ function createDataTransfer() {
     getData: (type: string) => data.get(type) ?? '',
     setData: (type: string, value: string) => {
       data.set(type, value);
-    }
+    },
   };
 }
 
@@ -121,6 +121,6 @@ function task(overrides: Pick<TaskItem, 'id' | 'title' | 'status'>): TaskItem {
     createdAt: '2026-08-22T12:00:00Z',
     createdBy: 'owner-1',
     updatedAt: '2026-08-22T12:00:00Z',
-    ...overrides
+    ...overrides,
   };
 }

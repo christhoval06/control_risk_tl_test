@@ -13,6 +13,6 @@ export {
   SelectScrollUpButton,
   SelectSeparator,
   SelectTrigger,
-  SelectValue
+  SelectValue,
 } from './Select';
 export { Textarea, textareaVariants, type TextareaProps } from './textarea';

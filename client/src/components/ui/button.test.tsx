@@ -16,7 +16,7 @@ describe('Button', () => {
     render(
       <Button size="sm" variant="destructive">
         Delete
-      </Button>
+      </Button>,
     );
 
     const button = screen.getByRole('button', { name: 'Delete' });

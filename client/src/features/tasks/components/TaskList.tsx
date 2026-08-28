@@ -30,12 +30,21 @@ export function TaskList({ tasks, isLoading, onStatusChange, onDelete }: Props) 
             </div>
           </div>
           <div className="grid content-start gap-2">
-            <select className="form-field py-1 text-sm" value={task.status}
-              onChange={(event) => void onStatusChange(task, event.target.value as TaskStatus)}>
-              {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
+            <select
+              className="form-field py-1 text-sm"
+              value={task.status}
+              onChange={(event) => void onStatusChange(task, event.target.value as TaskStatus)}
+            >
+              {statuses.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
             </select>
-            <button className="rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-700"
-              onClick={() => void onDelete(task)}>
+            <button
+              className="rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-700"
+              onClick={() => void onDelete(task)}
+            >
               Delete
             </button>
           </div>

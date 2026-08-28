@@ -8,13 +8,13 @@ export const textareaVariants = cva(
     variants: {
       variant: {
         default: 'border-slate-300 focus-visible:border-mint',
-        invalid: 'border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500/20'
-      }
+        invalid: 'border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500/20',
+      },
     },
     defaultVariants: {
-      variant: 'default'
-    }
-  }
+      variant: 'default',
+    },
+  },
 );
 
 export interface TextareaProps extends ComponentProps<'textarea'>, VariantProps<typeof textareaVariants> {}

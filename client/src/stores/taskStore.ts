@@ -27,20 +27,23 @@ export const useTaskStore = create<TaskState>((set) => ({
   isSaving: false,
   error: null,
   setTasks: (tasks) => set({ tasks }),
-  upsertTask: (task) => set((state) => ({
-    tasks: state.tasks.some((item) => item.id === task.id)
-      ? state.tasks.map((item) => item.id === task.id ? task : item)
-      : [task, ...state.tasks]
-  })),
-  updateTaskStatus: (id, status) => set((state) => ({
-    tasks: state.tasks.map((task) => task.id === id ? { ...task, status } : task)
-  })),
-  removeTaskById: (id) => set((state) => ({
-    tasks: state.tasks.filter((task) => task.id !== id)
-  })),
+  upsertTask: (task) =>
+    set((state) => ({
+      tasks: state.tasks.some((item) => item.id === task.id)
+        ? state.tasks.map((item) => (item.id === task.id ? task : item))
+        : [task, ...state.tasks],
+    })),
+  updateTaskStatus: (id, status) =>
+    set((state) => ({
+      tasks: state.tasks.map((task) => (task.id === id ? { ...task, status } : task)),
+    })),
+  removeTaskById: (id) =>
+    set((state) => ({
+      tasks: state.tasks.filter((task) => task.id !== id),
+    })),
   setQuery: (query) => set((state) => ({ query: { ...state.query, ...query } })),
   setIsLoading: (isLoading) => set({ isLoading }),
   setIsSaving: (isSaving) => set({ isSaving }),
   setError: (error) => set({ error }),
-  reset: () => set({ tasks: [], query: initialQuery, isLoading: false, isSaving: false, error: null })
+  reset: () => set({ tasks: [], query: initialQuery, isLoading: false, isSaving: false, error: null }),
 }));

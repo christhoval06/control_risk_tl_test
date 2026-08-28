@@ -11,7 +11,8 @@ export function BrokerLoginPanel({ isReady, isBusy, error, onLogin }: BrokerLogi
   return (
     <>
       <p className="mt-3 text-sm text-slate-600">
-        Sign in through Microsoft Entra. Google, GitHub, and Microsoft are configured as identity providers in the broker.
+        Sign in through Microsoft Entra. Google, GitHub, and Microsoft are configured as identity providers in the
+        broker.
       </p>
       <div className="mt-6 grid gap-3">
         <button
@@ -29,7 +30,10 @@ export function BrokerLoginPanel({ isReady, isBusy, error, onLogin }: BrokerLogi
       </div>
       {error && <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
       <p className="mt-5 text-sm text-slate-600">
-        New to the app? <Link className="font-semibold text-teal-700" to="/register">Complete your profile</Link>
+        New to the app?{' '}
+        <Link className="font-semibold text-teal-700" to="/register">
+          Complete your profile
+        </Link>
       </p>
     </>
   );
