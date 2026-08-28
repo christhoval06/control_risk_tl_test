@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PARAMS_FILE="$ROOT_DIR/infra/params.dev.json"
 TEMPLATE_FILE="$ROOT_DIR/infra/main.bicep"
+SQL_TEMPLATE_FILE="$ROOT_DIR/infra/sql.bicep"
 
 ENVIRONMENT_NAME="dev"
 LOCATION=""
@@ -11,8 +12,11 @@ SUBSCRIPTION_ID="${AZURE_SUBSCRIPTION_ID:-}"
 TENANT_ID="${AZURE_TENANT_ID:-}"
 RESOURCE_GROUP=""
 APP_NAME=""
+FUNCTION_PLAN_SKU=""
+FUNCTION_PLAN_TIER=""
 SKIP_LOGIN_CHECK=0
 WHAT_IF=0
+SQL_ONLY=0
 
 usage() {
   cat <<'USAGE'
@@ -30,7 +34,11 @@ Options:
   --tenant <id>              Azure tenant id. Defaults to AZURE_TENANT_ID.
   --resource-group <name>    Resource group name. Defaults to rg-task-management-<environment>.
   --app-name <name>          App name used by Bicep. Defaults to infra/params.dev.json.
+  --function-plan-sku <sku>  Function plan SKU. Defaults to FC1 for dev/staging and EP1 for prod.
+  --function-plan-tier <tier>
+                              Function plan tier. Defaults to FlexConsumption for dev/staging and ElasticPremium for prod.
   --params <file>            Deployment parameters file. Defaults to infra/params.dev.json.
+  --sql-only                 Deploy only Azure SQL Server and database. Skips Function App, App Service plan, and APIM.
   --skip-login-check         Skip az account validation.
   --what-if                  Run az deployment group what-if instead of create.
   -h, --help                 Show this help.
@@ -47,6 +55,11 @@ Required tools:
 Examples:
   scripts/deploy-local.sh dev --what-if
   AZURE_SUBSCRIPTION_ID=<id> scripts/deploy-local.sh dev
+
+If Azure returns ServerFarmCreationNotAllowed for Y1, B1, and FC1, the
+subscription is blocked from creating Microsoft.Web/serverFarms. Register
+Microsoft.Web, request App Service / Azure Functions hosting access, or use
+another subscription.
 USAGE
 }
 
@@ -105,9 +118,22 @@ parse_args() {
         APP_NAME="${2:-}"
         shift 2
         ;;
+      --function-plan-sku)
+        FUNCTION_PLAN_SKU="${2:-}"
+        shift 2
+        ;;
+      --function-plan-tier)
+        FUNCTION_PLAN_TIER="${2:-}"
+        shift 2
+        ;;
       --params)
         PARAMS_FILE="${2:-}"
         shift 2
+        ;;
+      --sql-only)
+        SQL_ONLY=1
+        TEMPLATE_FILE="$SQL_TEMPLATE_FILE"
+        shift
         ;;
       --skip-login-check)
         SKIP_LOGIN_CHECK=1
@@ -139,6 +165,7 @@ preflight() {
 
   [[ -f "$PARAMS_FILE" ]] || die "Parameters file not found: $PARAMS_FILE"
   [[ -f "$TEMPLATE_FILE" ]] || die "Bicep template not found: $TEMPLATE_FILE"
+  [[ "$SQL_ONLY" -eq 0 || -f "$SQL_TEMPLATE_FILE" ]] || die "SQL Bicep template not found: $SQL_TEMPLATE_FILE"
   jq empty "$PARAMS_FILE" >/dev/null
 
   case "$ENVIRONMENT_NAME" in
@@ -150,6 +177,8 @@ preflight() {
 load_defaults() {
   LOCATION="${LOCATION:-$(param_value location)}"
   APP_NAME="${APP_NAME:-$(param_value appName)}"
+  FUNCTION_PLAN_SKU="${FUNCTION_PLAN_SKU:-$(jq -er '.parameters.functionPlanSku.value // empty' "$PARAMS_FILE" 2>/dev/null || true)}"
+  FUNCTION_PLAN_TIER="${FUNCTION_PLAN_TIER:-$(jq -er '.parameters.functionPlanTier.value // empty' "$PARAMS_FILE" 2>/dev/null || true)}"
   RESOURCE_GROUP="${RESOURCE_GROUP:-rg-task-management-$ENVIRONMENT_NAME}"
   APIM_PUBLISHER_EMAIL="${APIM_PUBLISHER_EMAIL:-$(param_value apimPublisherEmail)}"
   APIM_PUBLISHER_NAME="${APIM_PUBLISHER_NAME:-$(param_value apimPublisherName)}"
@@ -160,14 +189,18 @@ load_defaults() {
 
   [[ -n "$LOCATION" ]] || die "Location is required."
   [[ -n "$APP_NAME" ]] || die "App name is required."
+  FUNCTION_PLAN_SKU="${FUNCTION_PLAN_SKU:-$([[ "$ENVIRONMENT_NAME" == "prod" ]] && echo EP1 || echo FC1)}"
+  FUNCTION_PLAN_TIER="${FUNCTION_PLAN_TIER:-$([[ "$ENVIRONMENT_NAME" == "prod" ]] && echo ElasticPremium || echo FlexConsumption)}"
   [[ -n "$SUBSCRIPTION_ID" ]] || die "Subscription id is required. Set AZURE_SUBSCRIPTION_ID or pass --subscription."
-  [[ -n "$APIM_PUBLISHER_EMAIL" ]] || die "APIM publisher email is required."
-  [[ -n "$APIM_PUBLISHER_NAME" ]] || die "APIM publisher name is required."
-  [[ -n "$JWT_AUTHORITY" ]] || die "JWT authority is required."
-  [[ -n "$JWT_AUDIENCE" ]] || die "JWT audience is required."
+  if [[ "$SQL_ONLY" -eq 0 ]]; then
+    [[ -n "$APIM_PUBLISHER_EMAIL" ]] || die "APIM publisher email is required."
+    [[ -n "$APIM_PUBLISHER_NAME" ]] || die "APIM publisher name is required."
+    [[ -n "$JWT_AUTHORITY" ]] || die "JWT authority is required."
+    [[ -n "$JWT_AUDIENCE" ]] || die "JWT audience is required."
+  fi
   [[ -n "$SQL_ADMIN_LOGIN" ]] || die "SQL admin login is required."
 
-  if [[ "$JWT_AUTHORITY" == *"<"* || "$JWT_AUDIENCE" == *"<"* ]]; then
+  if [[ "$SQL_ONLY" -eq 0 && ( "$JWT_AUTHORITY" == *"<"* || "$JWT_AUDIENCE" == *"<"* ) ]]; then
     die "JWT settings still contain placeholders. Set JWT_AUTHORITY and JWT_AUDIENCE."
   fi
 
@@ -199,6 +232,24 @@ run_deployment() {
   echo "Using subscription: $SUBSCRIPTION_ID"
   az account set --subscription "$SUBSCRIPTION_ID"
 
+  local sql_registration_state
+  sql_registration_state="$(az provider show --namespace Microsoft.Sql --query registrationState --output tsv 2>/dev/null || true)"
+  if [[ "$sql_registration_state" != "Registered" ]]; then
+    echo "Microsoft.Sql resource provider is not registered for this subscription." >&2
+    echo "Run: az provider register --namespace Microsoft.Sql --wait" >&2
+    exit 1
+  fi
+
+  if [[ "$SQL_ONLY" -eq 0 ]]; then
+    local web_registration_state
+    web_registration_state="$(az provider show --namespace Microsoft.Web --query registrationState --output tsv 2>/dev/null || true)"
+    if [[ "$web_registration_state" != "Registered" ]]; then
+      echo "Microsoft.Web resource provider is not registered for this subscription." >&2
+      echo "Run: az provider register --namespace Microsoft.Web --wait" >&2
+      exit 1
+    fi
+  fi
+
   echo "Ensuring resource group: $RESOURCE_GROUP ($LOCATION)"
   az group create \
     --name "$RESOURCE_GROUP" \
@@ -214,22 +265,38 @@ run_deployment() {
   fi
 
   echo "Running az deployment group $deployment_command: $deployment_name"
-  az deployment group "$deployment_command" \
-    --name "$deployment_name" \
-    --resource-group "$RESOURCE_GROUP" \
-    --template-file "$TEMPLATE_FILE" \
-    --parameters \
-      environmentName="$ENVIRONMENT_NAME" \
-      location="$LOCATION" \
-      appName="$APP_NAME" \
-      sqlAdministratorLogin="$SQL_ADMIN_LOGIN" \
-      sqlAdministratorPassword="$SQL_ADMIN_PASSWORD" \
-      apimPublisherEmail="$APIM_PUBLISHER_EMAIL" \
-      apimPublisherName="$APIM_PUBLISHER_NAME" \
-      jwtAuthority="$JWT_AUTHORITY" \
-      jwtAudience="$JWT_AUDIENCE" \
-      allowedOrigins="$CORS_ALLOWED_ORIGINS" \
-    --output table
+  if [[ "$SQL_ONLY" -eq 1 ]]; then
+    az deployment group "$deployment_command" \
+      --name "$deployment_name" \
+      --resource-group "$RESOURCE_GROUP" \
+      --template-file "$SQL_TEMPLATE_FILE" \
+      --parameters \
+        environmentName="$ENVIRONMENT_NAME" \
+        location="$LOCATION" \
+        appName="$APP_NAME" \
+        sqlAdministratorLogin="$SQL_ADMIN_LOGIN" \
+        sqlAdministratorPassword="$SQL_ADMIN_PASSWORD" \
+      --output table
+  else
+    az deployment group "$deployment_command" \
+      --name "$deployment_name" \
+      --resource-group "$RESOURCE_GROUP" \
+      --template-file "$TEMPLATE_FILE" \
+      --parameters \
+        environmentName="$ENVIRONMENT_NAME" \
+        location="$LOCATION" \
+        appName="$APP_NAME" \
+        functionPlanSku="$FUNCTION_PLAN_SKU" \
+        functionPlanTier="$FUNCTION_PLAN_TIER" \
+        sqlAdministratorLogin="$SQL_ADMIN_LOGIN" \
+        sqlAdministratorPassword="$SQL_ADMIN_PASSWORD" \
+        apimPublisherEmail="$APIM_PUBLISHER_EMAIL" \
+        apimPublisherName="$APIM_PUBLISHER_NAME" \
+        jwtAuthority="$JWT_AUTHORITY" \
+        jwtAudience="$JWT_AUDIENCE" \
+        allowedOrigins="$CORS_ALLOWED_ORIGINS" \
+      --output table
+  fi
 
   if [[ "$WHAT_IF" -eq 0 ]]; then
     echo

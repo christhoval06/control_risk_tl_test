@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { AccountInfo, PublicClientApplication } from '@azure/msal-browser';
 import ReactAuthProvider from 'react-auth-kit/AuthProvider';
 import useAuthHeader from 'react-auth-kit/hooks/useAuthHeader';
@@ -17,9 +17,7 @@ interface AuthContextValue {
   token: string;
   account: AuthUserState | null;
   isMsalReady: boolean;
-  setToken: (token: string) => void;
-  clearToken: () => void;
-  login: () => Promise<void>;
+  login: () => Promise<string>;
   logout: () => Promise<void>;
 }
 
@@ -36,48 +34,64 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 function AuthSessionProvider({ children }: { children: ReactNode }) {
   const [msalClient] = useState<PublicClientApplication | null>(() => createMsalClient());
+  const loginPromiseRef = useRef<Promise<string> | null>(null);
   const authHeader = useAuthHeader();
   const authUser = useAuthUser<AuthUserState | null>();
   const signIn = useSignIn<AuthUserState | null>();
   const signOut = useSignOut();
-  const token = normalizeBearerToken(authHeader);
-  const account = authUser ?? null;
+  const [sessionToken, setSessionToken] = useState(() => normalizeBearerToken(authHeader));
+  const [sessionAccount, setSessionAccount] = useState<AuthUserState | null>(() => authUser ?? null);
+  const token = sessionToken || normalizeBearerToken(authHeader);
+  const account = sessionAccount ?? authUser ?? null;
 
   const value = useMemo<AuthContextValue>(() => ({
     token,
     account,
     isMsalReady: Boolean(msalClient && isMsalConfigured()),
-    setToken: (nextToken) => {
-      if (!nextToken) {
-        signOut();
-        return;
-      }
-      signIn({ auth: { token: nextToken, type: 'Bearer' }, userState: null });
-    },
-    clearToken: () => {
-      signOut();
-    },
     login: async () => {
-      if (!msalClient) return;
-      await msalClient.initialize();
-      const loginResult = await msalClient.loginPopup({ scopes: [authScope] });
-      const tokenResult = await msalClient.acquireTokenSilent({
-        account: loginResult.account,
-        scopes: [authScope]
-      });
-      signIn({
-        auth: { token: tokenResult.accessToken, type: 'Bearer' },
-        userState: {
+      if (!msalClient) return '';
+      if (loginPromiseRef.current) {
+        return loginPromiseRef.current;
+      }
+
+      loginPromiseRef.current = (async () => {
+        await msalClient.initialize();
+        const loginResult = await msalClient.loginPopup({
+          scopes: [authScope],
+          overrideInteractionInProgress: true
+        });
+        const tokenResult = await msalClient.acquireTokenSilent({
+          account: loginResult.account,
+          scopes: [authScope]
+        });
+        const nextAccount = {
           username: loginResult.account.username,
           account: loginResult.account
+        };
+        const didSignIn = signIn({
+          auth: { token: tokenResult.accessToken, type: 'Bearer' },
+          userState: nextAccount
+        });
+        if (!didSignIn) {
+          throw new Error('Unable to store Microsoft Entra session.');
         }
+
+        setSessionToken(tokenResult.accessToken);
+        setSessionAccount(nextAccount);
+        return tokenResult.accessToken;
+      })().finally(() => {
+        loginPromiseRef.current = null;
       });
+
+      return loginPromiseRef.current;
     },
     logout: async () => {
       signOut();
+      setSessionToken('');
+      setSessionAccount(null);
       await msalClient?.logoutPopup();
     }
-  }), [account, msalClient, signIn, signOut, token]);
+  }), [account, authHeader, msalClient, sessionToken, signIn, signOut, token]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

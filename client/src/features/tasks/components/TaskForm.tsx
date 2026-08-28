@@ -1,12 +1,14 @@
 import { useForm } from 'react-hook-form';
+import { Button, Input, Label, Textarea } from '@components/ui';
 import type { CreateTaskInput } from '@features/tasks/types';
 
 interface Props {
   isSaving: boolean;
+  onCancel?: () => void;
   onSubmit: (input: CreateTaskInput) => Promise<void>;
 }
 
-export function TaskForm({ isSaving, onSubmit }: Props) {
+export function TaskForm({ isSaving, onCancel, onSubmit }: Props) {
   const { register, handleSubmit, reset, formState: { errors } } = useForm<CreateTaskInput>({
     defaultValues: { title: '', description: '', dueDate: '', assignedTo: '' }
   });
@@ -17,29 +19,30 @@ export function TaskForm({ isSaving, onSubmit }: Props) {
   }
 
   return (
-    <form className="task-panel" onSubmit={handleSubmit(submit)}>
-      <div className="mb-5 flex items-center justify-between gap-4">
-        <h2 className="text-lg font-semibold text-slate-950">New task</h2>
-        <button className="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-          disabled={isSaving} type="submit">
-          {isSaving ? 'Saving' : 'Create'}
-        </button>
+    <form className="grid gap-4" onSubmit={handleSubmit(submit)}>
+      <div>
+        <Label htmlFor="title">Title</Label>
+        <Input id="title" variant={errors.title ? 'invalid' : 'default'}
+          {...register('title', { required: 'Title is required.' })} />
       </div>
-      <label className="form-label" htmlFor="title">Title</label>
-      <input id="title" className={`form-field ${errors.title ? 'border-red-500' : ''}`}
-        {...register('title', { required: 'Title is required.' })} />
       {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title.message}</p>}
-      <label className="form-label mt-4" htmlFor="description">Description</label>
-      <textarea id="description" className="form-field min-h-24" {...register('description')} />
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
+      <div>
+        <Label htmlFor="description">Description</Label>
+        <Textarea id="description" {...register('description')} />
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
         <div>
-          <label className="form-label" htmlFor="dueDate">Due date</label>
-          <input id="dueDate" type="datetime-local" className="form-field" {...register('dueDate')} />
+          <Label htmlFor="dueDate">Due date</Label>
+          <Input id="dueDate" type="datetime-local" {...register('dueDate')} />
         </div>
         <div>
-          <label className="form-label" htmlFor="assignedTo">Assigned to</label>
-          <input id="assignedTo" className="form-field" {...register('assignedTo')} />
+          <Label htmlFor="assignedTo">Assigned to</Label>
+          <Input id="assignedTo" {...register('assignedTo')} />
         </div>
+      </div>
+      <div className="mt-2 flex justify-end gap-2">
+        {onCancel && <Button onClick={onCancel} variant="outline">Cancel</Button>}
+        <Button disabled={isSaving} type="submit">{isSaving ? 'Saving' : 'Create'}</Button>
       </div>
     </form>
   );

@@ -11,8 +11,6 @@ namespace TaskManagement.Api.Functions.Auth;
 
 public sealed class RegisterFunction
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     private readonly IAuthService _authService;
     private readonly IJwtPrincipalReader _principalReader;
 
@@ -38,7 +36,7 @@ public sealed class RegisterFunction
         {
             registerRequest = await JsonSerializer.DeserializeAsync<RegisterUserRequest>(
                 request.Body,
-                JsonOptions,
+                ApiJsonOptions.SerializerOptions,
                 cancellationToken);
         }
         catch (JsonException)

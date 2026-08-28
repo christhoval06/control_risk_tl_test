@@ -38,7 +38,7 @@ Install these tools before running the project locally:
 | Azure Functions Core Tools | v4 | Run the Azure Functions backend locally with `func start`. |
 | SQL Server tooling | `sqlcmd` or Azure Data Studio | Create the local database and run schema/stored procedure scripts. |
 | SQL Server runtime | Azure SQL Edge, SQL Server Developer Edition, or Docker SQL Server image | Host the local `TaskManagement` database. |
-| OAuth/OIDC provider | Microsoft Entra ID, Google, or compatible provider | Issue JWT access tokens for frontend login and backend authorization. |
+| OAuth/OIDC broker | Microsoft Entra External ID or Azure AD B2C | Issue JWT access tokens and federate Microsoft, Google, and GitHub login. |
 | Postman or Swagger UI | Current version | Test and inspect REST endpoints. |
 
 Optional but recommended:

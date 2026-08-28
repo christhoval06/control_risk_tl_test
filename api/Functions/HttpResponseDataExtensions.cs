@@ -8,8 +8,6 @@ namespace TaskManagement.Api.Functions;
 
 public static class HttpResponseDataExtensions
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     public static HttpResponseData CreateJsonResponse(
         this HttpRequestData request,
         HttpStatusCode statusCode,
@@ -18,8 +16,9 @@ public static class HttpResponseDataExtensions
         var response = request.CreateResponse();
         response.StatusCode = statusCode;
         response.Headers.Add("Content-Type", "application/json");
-        JsonSerializer.Serialize(response.Body, body, JsonOptions);
+        JsonSerializer.Serialize(response.Body, body, ApiJsonOptions.SerializerOptions);
         response.Body.Position = 0;
+        CorsHeaders.Apply(request, response);
 
         return response;
     }

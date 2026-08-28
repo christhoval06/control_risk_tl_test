@@ -11,8 +11,6 @@ namespace TaskManagement.Api.Functions.Tasks;
 
 public sealed class UpdateTaskStatusFunction
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     private readonly ITaskService _taskService;
     private readonly IJwtPrincipalReader _principalReader;
 
@@ -39,7 +37,7 @@ public sealed class UpdateTaskStatusFunction
         {
             updateRequest = await JsonSerializer.DeserializeAsync<UpdateTaskStatusRequest>(
                 request.Body,
-                JsonOptions,
+                ApiJsonOptions.SerializerOptions,
                 cancellationToken);
         }
         catch (JsonException)

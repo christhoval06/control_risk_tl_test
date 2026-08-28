@@ -17,11 +17,19 @@ public sealed class TaskService : ITaskService
 
     private readonly ITaskRepository _repository;
     private readonly ITaskFactory _taskFactory;
+    private readonly ITaskStatusEventPublisher _statusEventPublisher;
+    private readonly ICacheService _cache;
 
-    public TaskService(ITaskRepository repository, ITaskFactory taskFactory)
+    public TaskService(
+        ITaskRepository repository,
+        ITaskFactory taskFactory,
+        ITaskStatusEventPublisher statusEventPublisher,
+        ICacheService cache)
     {
         _repository = repository;
         _taskFactory = taskFactory;
+        _statusEventPublisher = statusEventPublisher;
+        _cache = cache;
     }
 
     /// <summary>
@@ -47,6 +55,7 @@ public sealed class TaskService : ITaskService
             request.AssignedTo);
 
         var created = await _repository.CreateAsync(task, cancellationToken);
+        await InvalidateUserTaskListsAsync(authenticatedUserId, cancellationToken);
 
         return ServiceResponse<TaskResponse>.Ok(
             Map(created),
@@ -64,14 +73,30 @@ public sealed class TaskService : ITaskService
     {
         EnsureAuthenticatedUser(authenticatedUserId);
 
-        var task = await _repository.GetByIdAsync(id, authenticatedUserId, cancellationToken);
-
-        return task is null
-            ? ServiceResponse<TaskResponse>.Error(ErrorCatalog.TaskNotFound)
-            : ServiceResponse<TaskResponse>.Ok(
-                Map(task),
+        var cacheKey = TaskItemCacheKey(authenticatedUserId, id);
+        var cached = await _cache.GetAsync<TaskResponse>(cacheKey, cancellationToken);
+        if (cached is not null)
+        {
+            return ServiceResponse<TaskResponse>.Ok(
+                cached,
                 ServiceCodes.TaskRetrieved,
                 "Task retrieved successfully.");
+        }
+
+        var task = await _repository.GetByIdAsync(id, authenticatedUserId, cancellationToken);
+
+        if (task is null)
+        {
+            return ServiceResponse<TaskResponse>.Error(ErrorCatalog.TaskNotFound);
+        }
+
+        var response = Map(task);
+        await _cache.SetAsync(cacheKey, response, cancellationToken);
+
+        return ServiceResponse<TaskResponse>.Ok(
+            response,
+            ServiceCodes.TaskRetrieved,
+            "Task retrieved successfully.");
     }
 
     /// <summary>
@@ -85,11 +110,23 @@ public sealed class TaskService : ITaskService
         EnsureAuthenticatedUser(authenticatedUserId);
 
         var normalizedQuery = Normalize(query);
+        var cacheKey = TaskListCacheKey(authenticatedUserId, normalizedQuery);
+        var cached = await _cache.GetAsync<TaskListResponse>(cacheKey, cancellationToken);
+        if (cached is not null)
+        {
+            return ServiceResponse<TaskListResponse>.Ok(
+                cached,
+                ServiceCodes.TasksListed,
+                "Tasks listed successfully.");
+        }
+
         var tasks = await _repository.ListAsync(authenticatedUserId, normalizedQuery, cancellationToken);
         var responses = tasks.Select(Map).ToArray();
+        var listResponse = new TaskListResponse(responses, normalizedQuery.Page, normalizedQuery.PageSize);
+        await _cache.SetAsync(cacheKey, listResponse, cancellationToken);
 
         return ServiceResponse<TaskListResponse>.Ok(
-            new TaskListResponse(responses, normalizedQuery.Page, normalizedQuery.PageSize),
+            listResponse,
             ServiceCodes.TasksListed,
             "Tasks listed successfully.");
     }
@@ -111,6 +148,10 @@ public sealed class TaskService : ITaskService
         }
 
         var updated = await _repository.UpdateAsync(id, authenticatedUserId, request, cancellationToken);
+        if (updated is not null)
+        {
+            await InvalidateUserTaskCacheAsync(authenticatedUserId, id, cancellationToken);
+        }
 
         return updated is null
             ? ServiceResponse<TaskResponse>.Error(ErrorCatalog.TaskNotFound)
@@ -137,12 +178,20 @@ public sealed class TaskService : ITaskService
             request.Status,
             cancellationToken);
 
-        return updated is null
-            ? ServiceResponse<TaskResponse>.Error(ErrorCatalog.TaskNotFound)
-            : ServiceResponse<TaskResponse>.Ok(
-                Map(updated),
-                ServiceCodes.TaskStatusUpdated,
-                "Task status updated successfully.");
+        if (updated is null)
+        {
+            return ServiceResponse<TaskResponse>.Error(ErrorCatalog.TaskNotFound);
+        }
+
+        await InvalidateUserTaskCacheAsync(authenticatedUserId, id, cancellationToken);
+        await _statusEventPublisher.PublishAsync(
+            new TaskStatusEvent(updated.Id, updated.Status),
+            cancellationToken);
+
+        return ServiceResponse<TaskResponse>.Ok(
+            Map(updated),
+            ServiceCodes.TaskStatusUpdated,
+            "Task status updated successfully.");
     }
 
     /// <summary>
@@ -156,6 +205,10 @@ public sealed class TaskService : ITaskService
         EnsureAuthenticatedUser(authenticatedUserId);
 
         var deleted = await _repository.DeleteAsync(id, authenticatedUserId, cancellationToken);
+        if (deleted)
+        {
+            await InvalidateUserTaskCacheAsync(authenticatedUserId, id, cancellationToken);
+        }
 
         return deleted
             ? ServiceResponse<object?>.Ok(null, ServiceCodes.TaskDeleted, "Task deleted successfully.")
@@ -178,6 +231,44 @@ public sealed class TaskService : ITaskService
             SortBy = sortBy,
             SortDirection = sortDirection
         };
+    }
+
+    private async Task InvalidateUserTaskCacheAsync(
+        string authenticatedUserId,
+        Guid taskId,
+        CancellationToken cancellationToken)
+    {
+        await _cache.RemoveAsync(TaskItemCacheKey(authenticatedUserId, taskId), cancellationToken);
+        await InvalidateUserTaskListsAsync(authenticatedUserId, cancellationToken);
+    }
+
+    private Task InvalidateUserTaskListsAsync(string authenticatedUserId, CancellationToken cancellationToken)
+    {
+        return _cache.RemoveByPrefixAsync(TaskListCachePrefix(authenticatedUserId), cancellationToken);
+    }
+
+    private static string TaskItemCacheKey(string authenticatedUserId, Guid taskId)
+    {
+        return $"tasks:item:{authenticatedUserId}:{taskId}";
+    }
+
+    private static string TaskListCachePrefix(string authenticatedUserId)
+    {
+        return $"tasks:list:{authenticatedUserId}:";
+    }
+
+    private static string TaskListCacheKey(string authenticatedUserId, TaskQuery query)
+    {
+        return string.Join(
+            ':',
+            TaskListCachePrefix(authenticatedUserId),
+            query.Status ?? string.Empty,
+            query.AssignedTo ?? string.Empty,
+            query.Search ?? string.Empty,
+            query.SortBy,
+            query.SortDirection,
+            query.Page,
+            query.PageSize);
     }
 
     private static void EnsureAuthenticatedUser(string authenticatedUserId)

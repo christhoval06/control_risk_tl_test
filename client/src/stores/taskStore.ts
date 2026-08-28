@@ -11,6 +11,7 @@ interface TaskState {
   error: string | null;
   setTasks: (tasks: TaskItem[]) => void;
   upsertTask: (task: TaskItem) => void;
+  updateTaskStatus: (id: string, status: TaskItem['status']) => void;
   removeTaskById: (id: string) => void;
   setQuery: (query: TaskQuery) => void;
   setIsLoading: (isLoading: boolean) => void;
@@ -30,6 +31,9 @@ export const useTaskStore = create<TaskState>((set) => ({
     tasks: state.tasks.some((item) => item.id === task.id)
       ? state.tasks.map((item) => item.id === task.id ? task : item)
       : [task, ...state.tasks]
+  })),
+  updateTaskStatus: (id, status) => set((state) => ({
+    tasks: state.tasks.map((task) => task.id === id ? { ...task, status } : task)
   })),
   removeTaskById: (id) => set((state) => ({
     tasks: state.tasks.filter((task) => task.id !== id)

@@ -283,13 +283,14 @@ Common HTTP response codes:
 
 ## Real-Time Updates
 
-The first implementation can use Server-Sent Events for task status changes:
+The current implementation uses Server-Sent Events for task status changes in local and single-instance deployments:
 
 - The frontend opens `/api/tasks/stream` with an access token.
-- The API emits status-change events.
+- The API keeps an SSE connection open through `TaskStatusStreamFunction`.
+- `TaskService.UpdateStatusAsync` publishes events through `ITaskStatusEventPublisher`.
 - The frontend updates local task state when an event arrives.
 
-For production scale, move this responsibility to Azure SignalR Service so updates work across multiple Function instances.
+The in-memory publisher is intentionally simple and process-local. For production scale, move this responsibility to Azure SignalR Service so updates work across multiple Function instances.
 
 ## Frontend Architecture
 
