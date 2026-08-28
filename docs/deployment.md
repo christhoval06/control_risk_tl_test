@@ -141,6 +141,34 @@ export SQL_ADMIN_LOGIN='sqladminuser'
 
 The CLI validates local tools before it deploys. If Azure CLI, Azure Bicep CLI, or `jq` is missing, it stops and tells you which app to install. It reads `SQL_ADMIN_PASSWORD` from the environment or prompts for it securely; do not commit the password to any file.
 
+If your subscription cannot create Function App hosting plans, deploy only Azure SQL:
+
+```bash
+./scripts/deploy-local.sh dev --sql-only --what-if
+./scripts/deploy-local.sh dev --sql-only
+```
+
+Then apply the SQL scripts and update `api/local.settings.json` for local API runs:
+
+```bash
+./scripts/setup-azure-sql-local-api.sh \
+  --jwt-authority 'https://login.microsoftonline.com/<tenant-id>/v2.0' \
+  --jwt-audience 'api://<api-client-id>'
+```
+
+The setup script discovers the Azure SQL server from `rg-task-management-dev`, opens a temporary firewall rule for your public IP, creates the database if needed, runs `sql/001_schema.sql` and `sql/002_stored_procedures.sql`, updates `api/local.settings.json`, and removes the firewall rule. Pass `--keep-firewall-rule` if you want to keep the rule.
+
+Dev deployments default the Function App plan to `FC1/FlexConsumption`, the serverless Linux Azure Functions plan. Dedicated plans such as `B1/Basic` require App Service VM quota; use them only when your subscription has quota available.
+
+If Azure returns `ServerFarmCreationNotAllowed` for `Y1`, `B1`, and `FC1`, the subscription is blocked from creating Function App hosting plans. Check the provider registration:
+
+```bash
+az provider show --namespace Microsoft.Web --query registrationState -o tsv
+az provider register --namespace Microsoft.Web --wait
+```
+
+If registration is already `Registered`, request App Service / Azure Functions hosting access for the subscription or deploy to another subscription.
+
 Useful flags:
 
 ```text
@@ -149,7 +177,10 @@ Useful flags:
 --tenant <id>
 --resource-group <name>
 --app-name <name>
+--function-plan-sku <sku>
+--function-plan-tier <tier>
 --params <file>
+--sql-only
 --skip-login-check
 --what-if
 ```

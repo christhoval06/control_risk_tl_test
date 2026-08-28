@@ -11,8 +11,6 @@ namespace TaskManagement.Api.Functions.Tasks;
 
 public sealed class CreateTaskFunction
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     private readonly ITaskService _taskService;
     private readonly IJwtPrincipalReader _principalReader;
 
@@ -38,7 +36,7 @@ public sealed class CreateTaskFunction
         {
             createRequest = await JsonSerializer.DeserializeAsync<CreateTaskRequest>(
                 request.Body,
-                JsonOptions,
+                ApiJsonOptions.SerializerOptions,
                 cancellationToken);
         }
         catch (JsonException)

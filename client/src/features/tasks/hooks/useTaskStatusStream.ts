@@ -16,7 +16,11 @@ export function useTaskStatusStream(
 
     const stream = new EventSource(`${apiBaseUrl}/tasks/stream?access_token=${encodeURIComponent(token)}`);
     stream.addEventListener('task-status-updated', (event) => {
-      onStatusChange(JSON.parse((event as MessageEvent).data) as StatusEvent);
+      try {
+        onStatusChange(JSON.parse((event as MessageEvent).data) as StatusEvent);
+      } catch {
+        // Ignore malformed stream events and keep the connection alive.
+      }
     });
 
     return () => stream.close();

@@ -11,7 +11,8 @@ const generated = vi.hoisted(() => ({
   create: vi.fn(),
   updateStatus: vi.fn(),
   remove: vi.fn(),
-  refetch: vi.fn()
+  refetch: vi.fn(),
+  toast: vi.fn()
 }));
 
 vi.mock('@api/hooks/default/useListTasks', () => ({
@@ -29,6 +30,10 @@ vi.mock('@api/hooks/default/useUpdateTaskStatus', () => ({
 
 vi.mock('@api/hooks/default/useDeleteTask', () => ({
   useDeleteTask: generated.remove
+}));
+
+vi.mock('@hooks/useToast', () => ({
+  useToast: () => ({ toast: generated.toast })
 }));
 
 const task: TaskItem = {
@@ -49,6 +54,7 @@ describe('useTasks', () => {
   beforeEach(() => {
     queryClient = new QueryClient();
     useTaskStore.getState().reset();
+    generated.toast.mockClear();
     generated.refetch.mockResolvedValue({
       data: { data: { items: [task], page: 1, pageSize: 20 }, code: 'TASKS_LISTED', status: 'ok', message: 'Tasks listed successfully.' }
     });
@@ -85,5 +91,26 @@ describe('useTasks', () => {
     expect(generated.create().mutateAsync).toHaveBeenCalledWith({ body: input });
     expect(generated.updateStatus().mutateAsync).toHaveBeenCalledWith({ path: { id: task.id }, body: { status: 'Done' } });
     expect(generated.remove().mutateAsync).toHaveBeenCalledWith({ path: { id: task.id } });
+    expect(generated.toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Task created', variant: 'success' }));
+    expect(generated.toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Task moved', variant: 'success' }));
+    expect(generated.toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Task deleted', variant: 'success' }));
+  });
+
+  it('notifies the user when a task operation fails', async () => {
+    const create = { mutateAsync: vi.fn().mockRejectedValue(new Error('failed')), isPending: false, isError: false };
+    generated.create.mockReturnValue(create);
+    const wrapper = ({ children }: PropsWithChildren) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useTasks('access-token'), { wrapper });
+
+    await act(async () => {
+      await result.current.submitTask({ title: task.title });
+    });
+
+    expect(generated.toast).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Unable to save task',
+      variant: 'error'
+    }));
   });
 });

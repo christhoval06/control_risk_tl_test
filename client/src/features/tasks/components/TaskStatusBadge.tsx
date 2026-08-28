@@ -7,5 +7,5 @@ const badgeClass: Record<TaskStatus, string> = {
 };
 
 export function TaskStatusBadge({ status }: { status: TaskStatus }) {
-  return <span className={`rounded-full px-3 py-1 text-xs font-bold ${badgeClass[status]}`}>{status}</span>;
+  return <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${badgeClass[status]}`}>{status}</span>;
 }

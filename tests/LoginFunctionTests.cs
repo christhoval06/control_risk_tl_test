@@ -25,9 +25,10 @@ public sealed class LoginFunctionTests
 
         var function = new LoginFunction(service.Object, principalReader.Object);
 
-        var response = await function.Run(CreateRequest(), CancellationToken.None);
+        var response = await function.Run(CreateRequest("http://localhost:5173"), CancellationToken.None);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Contains("http://localhost:5173", response.Headers.GetValues("Access-Control-Allow-Origin"));
         var body = ReadJson(response);
         Assert.Equal(ServiceResponseStatus.Error, body.RootElement.GetProperty("status").GetString());
         Assert.Equal(ServiceCodes.AuthRequired, body.RootElement.GetProperty("code").GetString());
@@ -59,15 +60,21 @@ public sealed class LoginFunctionTests
         Assert.Equal("github", body.RootElement.GetProperty("data").GetProperty("provider").GetString());
     }
 
-    private static HttpRequestData CreateRequest()
+    private static HttpRequestData CreateRequest(string? origin = null)
     {
         var context = new Mock<FunctionContext>().Object;
         var request = new Mock<HttpRequestData>(context);
         var response = new Mock<HttpResponseData>(context);
+        var requestHeaders = new HttpHeadersCollection();
+        if (!string.IsNullOrWhiteSpace(origin))
+        {
+            requestHeaders.Add("Origin", origin);
+        }
 
         response.SetupProperty(item => item.StatusCode);
         response.SetupGet(item => item.Headers).Returns(new HttpHeadersCollection());
         response.SetupGet(item => item.Body).Returns(new MemoryStream());
+        request.SetupGet(item => item.Headers).Returns(requestHeaders);
         request.Setup(item => item.CreateResponse()).Returns(response.Object);
 
         return request.Object;

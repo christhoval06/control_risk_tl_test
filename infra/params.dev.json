@@ -11,6 +11,12 @@
     "appName": {
       "value": "taskmgmt"
     },
+    "functionPlanSku": {
+      "value": "FC1"
+    },
+    "functionPlanTier": {
+      "value": "FlexConsumption"
+    },
     "allowedOrigins": {
       "value": [
         "http://localhost:5173"

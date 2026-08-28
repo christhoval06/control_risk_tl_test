@@ -27,4 +27,12 @@ describe('useTaskStore', () => {
       pageSize: 20
     });
   });
+
+  it('updates task status from stream events', () => {
+    useTaskStore.getState().setTasks([task]);
+
+    useTaskStore.getState().updateTaskStatus(task.id, 'In Progress');
+
+    expect(useTaskStore.getState().tasks[0].status).toBe('In Progress');
+  });
 });

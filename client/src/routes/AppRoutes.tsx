@@ -1,7 +1,7 @@
 import { createBrowserRouter, redirect, RouterProvider } from 'react-router';
 import { AuthGate } from '@routes/AuthGate';
 
-const router = createBrowserRouter([
+export const appRoutes = [
   {
     path: '/',
     loader: () => redirect('/login')
@@ -9,6 +9,10 @@ const router = createBrowserRouter([
   {
     path: '/login',
     lazy: () => import('@features/auth/pages/LoginPage')
+  },
+  {
+    path: '/auth/callback',
+    lazy: () => import('@features/auth/pages/AuthCallbackPage')
   },
   {
     path: '/register',
@@ -27,7 +31,9 @@ const router = createBrowserRouter([
     path: '*',
     loader: () => redirect('/login')
   }
-]);
+];
+
+const router = createBrowserRouter(appRoutes);
 
 export function AppRoutes() {
   return <RouterProvider router={router} />;

@@ -1,0 +1,76 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    environment:
+      AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFeqCnf2K0E6F10OcvlHMd9P/F5DyqQGz9Zl6YG4A80k79nDIQ5dTDPmPAXdZfn9Iqk4IA==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;"
+      FUNCTIONS_WORKER_RUNTIME: dotnet-isolated
+      SqlConnectionString: "Server=tcp:sqlserver,1433;Initial Catalog=TaskManagement;Persist Security Info=False;User ID=sa;Password=${SQL_SA_PASSWORD:-YourStrong!Passw0rd};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;"
+      Jwt__Authority: "${JWT_AUTHORITY:-https://login.microsoftonline.com/e5bb5584-fafc-465b-a25a-1660b837cfee/v2.0}"
+      Jwt__Audience: "${JWT_AUDIENCE:-api://d8562103-ea82-4fbb-bf83-8d30b64fb5ef}"
+      Cors__AllowedOrigins: "${CORS_ALLOWED_ORIGINS:-http://localhost:5173}"
+      Redis__ConnectionString: "redis:6379"
+      Cache__Enabled: "${CACHE_ENABLED:-true}"
+      Cache__DefaultTtlSeconds: "${CACHE_DEFAULT_TTL_SECONDS:-60}"
+    ports:
+      - "7071:80"
+    depends_on:
+      sql-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+      azurite:
+        condition: service_started
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${SQL_SA_PASSWORD:-YourStrong!Passw0rd}"
+      MSSQL_PID: Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -Q \"SELECT 1\" >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  sql-init:
+    image: mcr.microsoft.com/mssql-tools
+    environment:
+      SQL_SA_PASSWORD: "${SQL_SA_PASSWORD:-YourStrong!Passw0rd}"
+      DATABASE_NAME: TaskManagement
+    volumes:
+      - ./sql:/sql:ro
+      - ./scripts/init-local-sql.sh:/scripts/init-local-sql.sh:ro
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "/scripts/init-local-sql.sh"]
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.35.0
+    command: "azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0"
+    ports:
+      - "10000:10000"
+      - "10001:10001"
+      - "10002:10002"
+    volumes:
+      - azurite-data:/data
+
+volumes:
+  sqlserver-data:
+  redis-data:
+  azurite-data:

@@ -1,16 +1,13 @@
 import { useAuth } from '@features/auth/providers/AuthProvider';
 import { useLogout } from '@api/hooks/default/useLogout';
+import { Button } from '@components/ui';
 import { apiBaseUrl } from '@configs/api';
-import { TaskFilters } from '@features/tasks/components/TaskFilters';
-import { TaskForm } from '@features/tasks/components/TaskForm';
-import { TaskList } from '@features/tasks/components/TaskList';
-import { useTasks } from '@features/tasks/hooks/useTasks';
+import { TaskBoard } from '@features/tasks/components/TaskBoard';
 import { Link, useNavigate } from 'react-router';
 
 function TaskManagementPage() {
   const navigate = useNavigate();
   const { token, account, logout } = useAuth();
-  const tasks = useTasks(token);
   const logoutMutation = useLogout({ client: { baseURL: apiBaseUrl, auth: token } });
 
   const closeSession = async () => {
@@ -23,43 +20,35 @@ function TaskManagementPage() {
   };
 
   return (
-    <main className="mx-auto min-h-screen w-[min(1180px,calc(100%-32px))] py-8">
-      <section className="mb-6 grid gap-4 sm:flex sm:items-center sm:justify-between">
-        <div>
-          <p className="mb-1 text-sm font-bold uppercase text-mint">Azure task workspace</p>
-          <h1 className="text-4xl font-black leading-none text-slate-950 sm:text-6xl">Task Management</h1>
+    <main className="mx-auto min-h-screen w-[min(1440px,calc(100%-32px))] py-8">
+      <section className="task-panel mb-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+        <div className="max-w-3xl">
+          <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-teal-700">Task operations</p>
+          <h1 className="text-4xl font-black leading-none text-slate-950 sm:text-5xl">Task Management</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+            Track ownership, due dates, and delivery status across the team in a compact Kanban workspace.
+          </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Link className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700" to="/register">
+        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+          <Link className="inline-flex h-10 items-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50" to="/register">
             Profile
           </Link>
-          <button className="rounded-md border border-slate-950 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50"
-            onClick={() => void tasks.loadTasks()} disabled={!token || tasks.isLoading}>
-            Refresh
-          </button>
-          <button className="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white"
+          <Button variant="outline"
             onClick={() => void closeSession()}>
             Logout
-          </button>
+          </Button>
         </div>
       </section>
 
       <div className="grid gap-4">
-        <section className="task-panel flex flex-wrap items-center justify-between gap-3">
+        <section className="task-panel flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold text-slate-950">Session</h2>
+            <h2 className="text-lg font-bold text-slate-950">Workspace session</h2>
             <p className="text-sm text-slate-500">{account?.username ?? 'Authenticated with external identity provider.'}</p>
           </div>
+          <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-emerald-700">Connected</span>
         </section>
-        {tasks.error && <div className="rounded-md border border-red-200 bg-red-50 p-4 text-red-700" role="alert">{tasks.error}</div>}
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="grid gap-4">
-            <TaskFilters query={tasks.query} onChange={tasks.setQuery} />
-            <TaskList tasks={tasks.tasks} isLoading={tasks.isLoading}
-              onStatusChange={tasks.changeStatus} onDelete={tasks.removeTask} />
-          </div>
-          <TaskForm isSaving={tasks.isSaving} onSubmit={tasks.submitTask} />
-        </div>
+        <TaskBoard />
       </div>
     </main>
   );

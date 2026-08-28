@@ -38,6 +38,12 @@ param sqlAdministratorLogin string
 @description('SQL administrator password. Provide from GitHub Actions secret, never commit it.')
 param sqlAdministratorPassword string
 
+@description('Azure Functions hosting plan SKU. Use FC1 for serverless Flex Consumption, or a dedicated SKU such as B1 if quota allows it.')
+param functionPlanSku string = environmentName == 'prod' ? 'EP1' : 'FC1'
+
+@description('Azure Functions hosting plan tier. Match the selected SKU, such as FlexConsumption for FC1, ElasticPremium for EP1, Basic for B1, or Dynamic for Y1.')
+param functionPlanTier string = environmentName == 'prod' ? 'ElasticPremium' : 'FlexConsumption'
+
 var suffix = uniqueString(resourceGroup().id, appName, environmentName)
 var normalizedAppName = toLower('${appName}-${environmentName}-${suffix}')
 var storageAccountPrefix = take(replace(toLower('st${appName}${environmentName}'), '-', ''), 11)
@@ -92,10 +98,10 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
 resource plan 'Microsoft.Web/serverfarms@2023-12-01' = {
   name: planName
   location: location
-  kind: 'linux'
+  kind: functionPlanSku == 'FC1' ? 'functionapp' : 'linux'
   sku: {
-    name: 'Y1'
-    tier: 'Dynamic'
+    name: functionPlanSku
+    tier: functionPlanTier
   }
   properties: {
     reserved: true
@@ -150,6 +156,10 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
       linuxFxVersion: 'DOTNET-ISOLATED|10.0'
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
+      alwaysOn: contains([
+        'Y1'
+        'FC1'
+      ], functionPlanSku) ? false : true
       cors: {
         allowedOrigins: allowedOrigins
         supportCredentials: false
