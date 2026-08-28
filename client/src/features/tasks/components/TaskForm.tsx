@@ -9,8 +9,13 @@ interface Props {
 }
 
 export function TaskForm({ isSaving, onCancel, onSubmit }: Props) {
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<CreateTaskInput>({
-    defaultValues: { title: '', description: '', dueDate: '', assignedTo: '' }
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<CreateTaskInput>({
+    defaultValues: { title: '', description: '', dueDate: '', assignedTo: '' },
   });
 
   async function submit(input: CreateTaskInput) {
@@ -22,8 +27,11 @@ export function TaskForm({ isSaving, onCancel, onSubmit }: Props) {
     <form className="grid gap-4" onSubmit={handleSubmit(submit)}>
       <div>
         <Label htmlFor="title">Title</Label>
-        <Input id="title" variant={errors.title ? 'invalid' : 'default'}
-          {...register('title', { required: 'Title is required.' })} />
+        <Input
+          id="title"
+          variant={errors.title ? 'invalid' : 'default'}
+          {...register('title', { required: 'Title is required.' })}
+        />
       </div>
       {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title.message}</p>}
       <div>
@@ -41,8 +49,14 @@ export function TaskForm({ isSaving, onCancel, onSubmit }: Props) {
         </div>
       </div>
       <div className="mt-2 flex justify-end gap-2">
-        {onCancel && <Button onClick={onCancel} variant="outline">Cancel</Button>}
-        <Button disabled={isSaving} type="submit">{isSaving ? 'Saving' : 'Create'}</Button>
+        {onCancel && (
+          <Button onClick={onCancel} variant="outline">
+            Cancel
+          </Button>
+        )}
+        <Button disabled={isSaving} type="submit">
+          {isSaving ? 'Saving' : 'Create'}
+        </Button>
       </div>
     </form>
   );

@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const msalBrowser = vi.hoisted(() => ({
-  PublicClientApplication: vi.fn()
+  PublicClientApplication: vi.fn(),
 }));
 
 vi.mock('@azure/msal-browser', () => ({
-  PublicClientApplication: msalBrowser.PublicClientApplication
+  PublicClientApplication: msalBrowser.PublicClientApplication,
 }));
 
 describe('authClient', () => {
@@ -27,9 +27,9 @@ describe('authClient', () => {
     expect(msalBrowser.PublicClientApplication).toHaveBeenCalledWith(
       expect.objectContaining({
         auth: expect.objectContaining({
-          authority: 'https://login.microsoftonline.com/tenant-id'
-        })
-      })
+          authority: 'https://login.microsoftonline.com/tenant-id',
+        }),
+      }),
     );
   });
 });

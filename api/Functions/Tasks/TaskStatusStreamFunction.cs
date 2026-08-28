@@ -11,6 +11,9 @@ namespace TaskManagement.Api.Functions.Tasks;
 
 public sealed class TaskStatusStreamFunction
 {
+    private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(25);
+    private static readonly TimeSpan MaxStreamDuration = TimeSpan.FromMinutes(25);
+
     private readonly ITaskStatusEventPublisher _publisher;
     private readonly IJwtPrincipalReader _principalReader;
 
@@ -39,13 +42,41 @@ public sealed class TaskStatusStreamFunction
         response.Headers.Add("Connection", "keep-alive");
         CorsHeaders.Apply(request, response);
 
-        await using var subscription = _publisher.Subscribe(cancellationToken);
-        await WriteAsync(response, ": connected\n\n", cancellationToken);
+        using var streamTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        streamTimeout.CancelAfter(MaxStreamDuration);
 
-        await foreach (var statusEvent in subscription.Events.ReadAllAsync(cancellationToken))
+        try
         {
-            var payload = JsonSerializer.Serialize(statusEvent, ApiJsonOptions.SerializerOptions);
-            await WriteAsync(response, $"event: task-status-updated\ndata: {payload}\n\n", cancellationToken);
+            await using var subscription = _publisher.Subscribe(streamTimeout.Token);
+            await WriteAsync(response, ": connected\n\n", streamTimeout.Token);
+
+            while (!streamTimeout.Token.IsCancellationRequested)
+            {
+                var eventAvailable = subscription.Events.WaitToReadAsync(streamTimeout.Token).AsTask();
+                var heartbeatDue = Task.Delay(HeartbeatInterval, streamTimeout.Token);
+                var completed = await Task.WhenAny(eventAvailable, heartbeatDue);
+
+                if (completed == heartbeatDue)
+                {
+                    await WriteAsync(response, ": heartbeat\n\n", streamTimeout.Token);
+                    continue;
+                }
+
+                if (!await eventAvailable)
+                {
+                    break;
+                }
+
+                while (subscription.Events.TryRead(out var statusEvent))
+                {
+                    var payload = JsonSerializer.Serialize(statusEvent, ApiJsonOptions.SerializerOptions);
+                    await WriteAsync(response, $"event: task-status-updated\ndata: {payload}\n\n", streamTimeout.Token);
+                }
+            }
+        }
+        catch (OperationCanceledException) when (streamTimeout.IsCancellationRequested)
+        {
+            // Client disconnects and host timeouts are normal for long-lived SSE connections.
         }
 
         return response;
@@ -60,4 +91,5 @@ public sealed class TaskStatusStreamFunction
         await response.Body.WriteAsync(bytes, cancellationToken);
         await response.Body.FlushAsync(cancellationToken);
     }
+
 }

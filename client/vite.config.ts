@@ -15,12 +15,12 @@ export default defineConfig({
       '@routes': fileURLToPath(new URL('./src/routes', import.meta.url)),
       '@stores': fileURLToPath(new URL('./src/stores', import.meta.url)),
       '@styles': fileURLToPath(new URL('./src/styles', import.meta.url)),
-      '@utils': fileURLToPath(new URL('./src/utils', import.meta.url))
-    }
+      '@utils': fileURLToPath(new URL('./src/utils', import.meta.url)),
+    },
   },
   test: {
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
-    globals: true
-  }
+    globals: true,
+  },
 });

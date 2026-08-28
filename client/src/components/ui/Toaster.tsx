@@ -1,4 +1,3 @@
-import { AnimatePresence } from 'framer-motion';
 import { cva } from 'class-variance-authority';
 import { CheckCircle, Info, TriangleAlert, OctagonAlert, type LucideProps } from 'lucide-react';
 

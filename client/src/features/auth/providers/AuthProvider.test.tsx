@@ -7,7 +7,7 @@ const authKit = vi.hoisted(() => ({
   authHeader: vi.fn(),
   authUser: vi.fn(),
   signIn: vi.fn(),
-  signOut: vi.fn()
+  signOut: vi.fn(),
 }));
 
 const authClient = vi.hoisted(() => ({
@@ -16,37 +16,37 @@ const authClient = vi.hoisted(() => ({
   initialize: vi.fn(),
   isMsalConfigured: vi.fn(),
   loginPopup: vi.fn(),
-  logoutPopup: vi.fn()
+  logoutPopup: vi.fn(),
 }));
 
 vi.mock('@features/auth/config/authClient', () => ({
   authScope: 'api://task-api/Tasks.Access',
   createMsalClient: authClient.createMsalClient,
-  isMsalConfigured: authClient.isMsalConfigured
+  isMsalConfigured: authClient.isMsalConfigured,
 }));
 
 vi.mock('react-auth-kit/hooks/useAuthHeader', () => ({
-  default: () => authKit.authHeader()
+  default: () => authKit.authHeader(),
 }));
 
 vi.mock('react-auth-kit/hooks/useAuthUser', () => ({
-  default: () => authKit.authUser()
+  default: () => authKit.authUser(),
 }));
 
 vi.mock('react-auth-kit/hooks/useSignIn', () => ({
-  default: () => authKit.signIn
+  default: () => authKit.signIn,
 }));
 
 vi.mock('react-auth-kit/hooks/useSignOut', () => ({
-  default: () => authKit.signOut
+  default: () => authKit.signOut,
 }));
 
 vi.mock('react-auth-kit/store/createAuthStore', () => ({
-  default: () => ({})
+  default: () => ({}),
 }));
 
 vi.mock('react-auth-kit/AuthProvider', () => ({
-  default: ({ children }: PropsWithChildren) => <>{children}</>
+  default: ({ children }: PropsWithChildren) => <>{children}</>,
 }));
 
 describe('AuthProvider', () => {
@@ -59,8 +59,8 @@ describe('AuthProvider', () => {
     authClient.initialize.mockResolvedValue(undefined);
     authClient.loginPopup.mockResolvedValue({
       account: {
-        username: 'ana@example.com'
-      }
+        username: 'ana@example.com',
+      },
     });
     authClient.acquireTokenSilent.mockResolvedValue({ accessToken: 'entra-token' });
     authClient.logoutPopup.mockResolvedValue(undefined);
@@ -69,7 +69,7 @@ describe('AuthProvider', () => {
       acquireTokenSilent: authClient.acquireTokenSilent,
       initialize: authClient.initialize,
       loginPopup: authClient.loginPopup,
-      logoutPopup: authClient.logoutPopup
+      logoutPopup: authClient.logoutPopup,
     });
   });
 
@@ -86,7 +86,7 @@ describe('AuthProvider', () => {
     authClient.loginPopup.mockReturnValue(
       new Promise((resolve) => {
         completeLogin = () => resolve({ account: { username: 'ana@example.com' } });
-      })
+      }),
     );
     const wrapper = ({ children }: PropsWithChildren) => <AuthProvider>{children}</AuthProvider>;
     const { result } = renderHook(() => useAuth(), { wrapper });
@@ -102,8 +102,8 @@ describe('AuthProvider', () => {
       auth: { token: 'entra-token', type: 'Bearer' },
       userState: {
         username: 'ana@example.com',
-        account: { username: 'ana@example.com' }
-      }
+        account: { username: 'ana@example.com' },
+      },
     });
   });
 
@@ -115,7 +115,7 @@ describe('AuthProvider', () => {
 
     expect(authClient.loginPopup).toHaveBeenCalledWith({
       scopes: ['api://task-api/Tasks.Access'],
-      overrideInteractionInProgress: true
+      overrideInteractionInProgress: true,
     });
   });
 

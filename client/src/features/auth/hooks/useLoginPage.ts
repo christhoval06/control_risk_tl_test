@@ -19,7 +19,7 @@ export function useLoginPage() {
       await completeApiLogin({
         baseURL: apiBaseUrl,
         auth: accessToken,
-        throwOnError: true
+        throwOnError: true,
       });
       navigate('/tasks');
     } catch (err) {
@@ -33,6 +33,6 @@ export function useLoginPage() {
     error,
     isReady: isMsalReady,
     isBusy: startedBrokerLogin,
-    startLogin
+    startLogin,
   };
 }

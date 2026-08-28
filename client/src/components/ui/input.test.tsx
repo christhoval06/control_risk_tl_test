@@ -18,7 +18,7 @@ describe('form controls', () => {
       <>
         <Label htmlFor="description">Description</Label>
         <Textarea id="description" />
-      </>
+      </>,
     );
 
     expect(screen.getByLabelText('Description')).toBeInTheDocument();

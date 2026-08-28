@@ -17,6 +17,21 @@
     "functionPlanTier": {
       "value": "FlexConsumption"
     },
+    "cacheEnabled": {
+      "value": true
+    },
+    "redisSkuName": {
+      "value": "Basic"
+    },
+    "redisSkuFamily": {
+      "value": "C"
+    },
+    "redisCapacity": {
+      "value": 0
+    },
+    "cacheDefaultTtlSeconds": {
+      "value": 60
+    },
     "allowedOrigins": {
       "value": [
         "http://localhost:5173"

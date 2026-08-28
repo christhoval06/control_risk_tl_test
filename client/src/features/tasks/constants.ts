@@ -6,16 +6,16 @@ export const taskStatusMeta: Record<TaskStatus, { label: string; accent: string;
   Pending: {
     label: 'Pending',
     accent: 'bg-amber-500',
-    description: 'Work queued for triage'
+    description: 'Work queued for triage',
   },
   'In Progress': {
     label: 'In Progress',
     accent: 'bg-blue-600',
-    description: 'Active work in motion'
+    description: 'Active work in motion',
   },
   Done: {
     label: 'Done',
     accent: 'bg-emerald-600',
-    description: 'Completed and closed'
-  }
+    description: 'Completed and closed',
+  },
 };
